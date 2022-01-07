@@ -26,6 +26,5 @@ El proyecto contiene cuatro componentes principales:
 1. Recolección y limpieza de datos.
 2. Análisis Exploratorio (EDA)
 3. Modelado
-4. Despliegue
 
 El modelado se realiza bajo el framework tidymodels.
