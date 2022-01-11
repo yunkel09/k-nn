@@ -97,28 +97,12 @@ import::from(cowplot, .except = "stamp")
 import::from(kableExtra, .except = "group_rows")
 import::from(DataExplorer, plot_intro, plot_bar, plot_density)
 import::from(conectigo, cargar_fuentes)
+import::from(rstatix, identify_outliers)
 pacman::p_load(janitor, themis, usemodels, tidymodels, tidyverse)
 ```
 
 ## Funciones
 
-```{r}
-# agregar línea loess a las gráficas ggpairs
-loess_lm <- function(data, mapping, ...){
- 
-ggplot(data = data, mapping = mapping) + 
-    geom_point(alpha = 0.9) + 
-    stat_smooth(formula = y ~ x, 
-                method = "lm", 
-                se = TRUE, 
-                color = "blue",
-                fill = "blue",
-                size = 0.5, 
-                alpha = 0.2,
-                linetype = "longdash", 
-                ...)
-}
-```
 
 ```{r}
 tabla <- function(df, cap = "prueba") {
@@ -126,91 +110,6 @@ tabla <- function(df, cap = "prueba") {
   df %>% 
    kbl(booktabs = TRUE, caption = cap, escape = F) %>% 
    kable_paper(lightable_options = "hover", full_width = F)}
-```
-
-```{r}
-formatear_df <- function(df, pval) {
-	
-	pv <- df[[pval]]
-	
-	df %>% 
-		mutate(
-			across(where(is.numeric), round, 4),
-			across(.data[[pval]], rd, 2),
-			sig = starmaker(x = pv, p.levels = c(.001, .01, .05, .1), 
-								 symbols = c("***", "**", "\\*", "\\+")))
-}
-```
-
-```{r}
-# generar gráfico de densidad
-estimar_densidad <- function(df, d, color) {
-	
-	brk <- hist(df[[d]], plot = FALSE)$breaks 
-	med <- mean(df[[d]])
-	
-	df %>% 
-	  ggplot(aes(x = .data[[d]], y = ..density..)) +
-	  geom_histogram(fill   = color,
-	                 colour = "black",
-	                 size   = .2,
-	                 breaks = brk) +
-	  scale_x_continuous(name   = d,
-	                     breaks = brk) +
-	  geom_density(size = 1) +
-	  geom_vline(xintercept = med, 
-	             linetype = "dashed",
-	             color = "red", 
-	             alpha = 0.5) 
-}
-```
-
-```{r}
-# crear qq-plots
-qpl <- function(df, var_y, rel) { 
-      
-      df %>% 
-       ggplot(aes(sample = .data[[var_y]])) +
-       qq$geom_qq_band(bandType = "pointwise", 
-                       distribution = "norm", 
-                       alpha = 0.5) +
-       qq$stat_qq_line() +
-       qq$stat_qq_point(size   = 2, 
-                        shape  = 21, 
-                        alpha  = 0.8, 
-                        fill   = rel, 
-                        colour = rel) +
-       labs(x = "Theoretical Quantiles", y = "Sample Quantiles") +
-       ggtitle(str_to_title(var_y)) +
-       theme(plot.title = element_text(size = 16))
-      
-     }
-```
-
-
-```{r}
-# pruebas de normalidad no paramétrica
-funciones <- list(
- 
-  shapiro_wilk       = function(x) shapiro.test(x),
-  jarque_bera        = function(x) JarqueBeraTest(x, robust = F),
-  pearson            = function(x) pearson.test(x), 
-  shapiro_francia    = function(x) sf.test(x),
-  kolgomoro_smirnov  = function(x) lillie.test(x)
-)
-```
-
-```{r}
-# aplicar pruebas de normalidad
-probar_normalidad <- function(vector) {
-	
-	funciones %>% 
-		map(exec, x = vector) %>% 
-		map_df(tidy) %>% 
-		select(method, p_value = p.value) %>% 
-		# mutate(normalidad = ifelse(p_value < 0.05, "NO_NORMAL", "NORMAL")) %>% 
-		arrange(desc(p_value))
-}
 ```
 
 ```{r}
@@ -226,6 +125,33 @@ resaltar <- function(texto) {
 unregister <- function() {
   env <- foreach:::.foreachGlobals
   rm(list=ls(name=env), pos=env)
+}
+```
+
+<!-- #56B4E9 -->
+<!-- #D55E00 -->
+
+```{r}
+barra <- function(df, x) {
+	
+	dfx <- df %>%
+		tabyl({{x}}) %>% 
+		adorn_pct_formatting()
+	
+	dfx %>% 
+		ggplot(aes(y = {{x}}, x = n)) +
+		geom_col(fill = "#0072B2", width = 0.8) +
+		geom_text(aes(label = str_c(n, " ", "(", percent, ")")),
+					 hjust = 1.5,
+					 size = 6,
+					 color = "white") +
+					 # fontface = "bold") +
+		scale_x_continuous(expand = c(0, 0)) +
+		scale_y_discrete(name = NULL, expand = c(0, 0.5)) +
+		coord_cartesian(clip = "off") +
+		theme_minimal_vgrid(font_family = "yano") +
+		theme(axis.text.y = element_text(size = 14),
+				plot.title = element_text(size = 22, face = "bold"))
 }
 ```
 
@@ -368,16 +294,60 @@ Vemos que la variable respuesta presenta un desbalance con 2788 casos para
 
 ## Variables dependiente
 
-```{r}
+(ref:desbalance) El desafío de trabajar con conjuntos de datos desequilibrados es que la mayoría de las técnicas de aprendizaje automático ignorarán y, a su vez, tendrán un rendimiento deficiente en la clase minoritaria, aunque normalmente lo más importante es el rendimiento en la clase minoritaria.
+
+```{r, desbalance, fig.cap='(ref:desbalance)'}
 spam %>% 
-	ggplot(aes(x = type)) +
-	geom_bar() +
-	labs(title = "Frecuencia de la variable Type")
+	barra(type) +
+	labs(title = "Clasificación desequilibrada")
 ```
 
-En el gráfico observamos que la variable no está equilibrada. La clase
-`r coloring_font("**no_spam**", "#A24000")` tiene más casos que la clase
-`r coloring_font("**spam**", "#A24000")`
+En el gráfico \@ref(fig:desbalance) observamos que la variable no está
+equilibrada. La clase `r coloring_font("**no_spam**", "#A24000")` tiene más
+casos que la clase `r coloring_font("**spam**", "#A24000")`. Si no balanceamos
+los datos entonces lo que pasará es que nuestro modelo aprenderá de manera muy
+eficaz sobre cómo predecir el caso negativo, es decir, cuando un correo no es
+spam.
+
+## Atípicos
+
+```{r}
+bike %>%
+	select(where(is.numeric)) %>% 
+	ggpairs(., lower = list(continuous = loess_lm),
+ 		     upper = list(continuous = wrap("cor", size = 5))) + drako
+```
+
+```{r}
+map(names(spam)[1:57], ~ spam %>%
+      group_by(type) %>% 
+      identify_outliers(.x))
+
+  set_names(names(S)[1:4]) %>% 
+  enframe() %>% 
+  unnest(value) %>%
+  arrange(name, species) %>% 
+  tabla("Atípicos por variable y especie")
+```
+
+```{r}
+map(names(iris)[1:4], ~ iris %>%
+      group_by(Species) %>% 
+      identify_outliers(.x)) %>% 
+  set_names(names(iris)[1:4]) %>% 
+  enframe() %>% 
+  unnest(value) %>%
+  arrange(name, Species) %>% 
+  tabla("Atípicos por variable y especie")
+```
+
+
+```{r}
+spam %>% 
+	rstatix::identify_outliers(type)
+```
+
+
 
 # Split
 
@@ -391,41 +361,7 @@ spam_test  <- testing(spam_split)
 dim(spam_train) # 70% para entrenamiento
 ```
 
-```{r, paged.print = FALSE}
-spam_train %>% 
-	tabyl(type) %>% 
-	adorn_pct_formatting() %>% 
-	adorn_totals(where = "row", name = "total") %>% 
-	tabla("Cantidad de Spam en train")
-```
-
-# Balanceo
-
-Si no balanceamos los datos entonces lo que pasará es que nuestro modelo
-aprenderá de manera muy eficaz sobre cómo predecir el caso negativo, es decir,
-cuando un correo no es spam.
-
-En lugar de utilizar `step_rose`, el cual es un *wrapper* de la función
-`ovun.sample` del paquete {ROSE}, utilizaremos `step_upsample()`. Lo que hará
-esta función será hacer que todos los demás niveles se muestrean para que tengan
-la misma frecuencia que el nivel más frecuente. 
-
-```{r}
-recipe(type ~ ., spam_train) %>% 
-	step_upsample(type, over_ratio = 1) %>% 
-	# step_rose(type) %>% 
-	prep() %>% 
-	juice() %>%
-	ggplot(aes(y = type)) +
-	geom_bar(fill = "#56B4E9", width = 0.8, alpha = 0.8) +
-	scale_x_continuous(expand = c(0, 0)) +
-	scale_y_discrete(name = NULL, expand = c(0, 0.5)) +
-	coord_cartesian(clip = "off") +
-	theme_minimal_vgrid(font_family = "yano") +
-	labs(title = "Sobremuestreo")
-```
-
-# Entrenar
+## CV
 
 Debido a que tenemos una muestra relativamente grande un CV con 10 K-fold será
 suficiente para obtener buenas propiedades de bias y varianza.
@@ -434,6 +370,8 @@ suficiente para obtener buenas propiedades de bias y varianza.
 set.seed(2021)
 spam_folds <- vfold_cv(spam_train, strata = type)
 ```
+
+# Recetas
 
 Crearemos varias recetas para poder probar con los distintos métodos que ayudan
 a corregir el desequilibrio entre las distintas clases.
@@ -444,56 +382,172 @@ Lo que haremos en general será:
 * Remover variables que tengan cero varianza o varianza próxima a cero.
 * Centrar y escalar
 
+Antes de realizar este procedimiento, validemos cuantas variables quedarían
+después de remover las variables tienen varianza cero o próxima a cero.
+
 ```{r}
-(kknn_recipe_submuestreo <- recipe(formula = type ~ ., data = spam_train) %>% 
-  step_downsample(type, under_ratio = 1) %>% 
-  prep() %>% juice() %>% 
-  step_nzv(all_predictors()) %>% 
-  step_normalize(all_numeric()) %>% 
-  prep())
+recipe(formula = type ~ ., data = spam_train) %>% 
+  step_nzv(all_predictors()) %>%
+  prep() %>% 
+  summary()
 ```
 
+Vemos que solo quedan 9 predictores.
+
+Ahora veamos que pasa si solo queremos retirar aquellas que tengan estrictamente
+varianza cero:
 
 ```{r}
-(kknn_recipe_sobremuestreo <- recipe(formula = type ~ ., data = spam_train) %>% 
-  step_upsample(type, over_ratio = 1) %>% 
-  step_nzv(all_predictors()) %>% 
-  step_normalize(all_numeric()) %>% 
-  prep())
+recipe(formula = type ~ ., data = spam_train) %>% 
+  step_zv(all_predictors()) %>%
+  prep() %>% 
+  summary()
 ```
 
+No hay ninguna variable que tenga varianza cero exacta.  Lo que haremos
+será dejar una receta que contemple todos los predictores y seleccionaremos
+un único método de balanceo, porque sino, tendríamos demasiadas recetas que
+probar.
+
+## SMOTE
+
+**Synthetic Minority Oversampling TEchnique**
+
+SMOTE funciona seleccionando ejemplos que están cerca en el espacio de
+funciones, dibujando una línea entre los ejemplos en el espacio de funciones y
+dibujando una nueva muestra en un punto a lo largo de esa línea.
+
+SMOTE primero selecciona una instancia de clase minoritaria a al azar y
+encuentra sus k vecinos de clase minoritaria más cercanos. Luego, la instancia
+sintética se crea eligiendo uno de los k vecinos b más cercanos al azar y
+conectando a y b para formar un segmento de línea en el espacio de
+características. Las instancias sintéticas se generan como una combinación
+convexa de las dos instancias elegidas a y b.
+
 ```{r}
-(kknn_recipe_rose <- recipe(formula = type ~ ., data = spam_train) %>% 
-  step_rose(type, skip = TRUE) %>% 
-  step_nzv(all_predictors()) %>% 
+knn_recipe_smote <- recipe(formula = type ~ ., data = spam_train) %>% 
+  step_nzv(all_predictors()) %>%
   step_normalize(all_numeric()) %>% 
-  prep())
+  step_smote(type, skip = TRUE) 
 ```
 
-
-
+Veamos como quedó esta receta a nivel de dataset:
 
 ```{r}
-kknn_spec <- 
-  nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
+knn_recipe_smote %>%
+	prep() %>%
+	juice()
+```
+
+Vemos que, a como habíamos previsto, que la función `step_nzv()` excluyó 48
+predictores debido a que tienen varianza próxima a cero, quedando únicamente
+9 predictores más la respuesta.
+
+(ref:smot) Realiza un sobremuestreo en el que la clase minoritaria se sobremuestrea creando ejemplos "sintéticos" en lugar de sobremuestrear con reemplazo.
+
+```{r smot, fig.cap='(ref:smot)'}
+knn_recipe_smote %>%
+	prep() %>%
+	juice() %>% 
+	barra(type) + labs("Clasificación Balanceada")
+```
+
+## Submuestreo
+
+Recordemos que en tidymodels las recetas de preprocesamiento que se apliquen
+a los datos de entrenamiento luego se aplican a los datos de prueba.  En el caso
+de pasos (*steps*) de pre-procesamiento que realizan sobre-muestreo o
+sub-muestreo es muy importante que este paso **no se aplique a los datos que
+estamos pronosticando**.  Por esta razón cuando usemos recetas debemos utilizar
+una opción llamada  `skip = TRUE`  para que se  ignore este paso en la fase
+de predicción (e.g con `predict()`).  
+
+La idea principal es aislar los pasos de pre-procesamiento que podrían causar
+errores si se aplican a nuevas muestras (e.g set de prueba).
+
+```{r}
+knn_recipe_submuestreo <- recipe(formula = type ~ ., data = spam_train) %>% 
+  step_nzv(all_predictors()) %>% 
+  step_normalize(all_numeric()) %>% 
+  step_downsample(type, skip = TRUE)
+```
+
+## Sobremuestreo
+
+```{r}
+knn_recipe_sobremuestreo <- recipe(formula = type ~ ., data = spam_train) %>% 
+  step_nzv(all_predictors()) %>% 
+  step_normalize(all_numeric()) %>% 
+  step_upsample(type, skip = TRUE)
+```
+
+## ROSE
+
+```{r}
+knn_recipe_rose <- recipe(formula = type ~ ., data = spam_train) %>% 
+  step_nzv(all_predictors()) %>% 
+  step_normalize(all_numeric()) %>% 
+  step_rose(type, skip = TRUE)
+```
+
+# Modelado
+
+```{r}
+knn_spec <- nearest_neighbor(neighbors = tune(),   # este es la cantidad de vecinos k a estimar
+									  weight_func = tune()) %>% 
   set_mode("classification") %>% 
   set_engine("kknn")
 ```
 
-
 ```{r}
-kknn_workflow <- 
-  workflow() %>% 
-  add_recipe(kknn_recipe) %>% 
-  add_model(kknn_spec)
+preprocesadores_knn <- list(knn_smote = knn_recipe_smote, 
+									 knn_submu = knn_recipe_submuestreo,
+									 knn_sobre = knn_recipe_sobremuestreo,
+									 knn_rosex = knn_recipe_rose)
 ```
 
 
 ```{r}
+modelo_knn <- list(knn = knn_spec)
+```
+
+
+```{r}
+spam_workflow <- workflow_set(preprocesadores_knn, modelo_knn)
+```
+
+Con la función `control_grid()` lo que haremos será retener los modelos y
+recetas ajustados. Además, cuando establecemos la opción save_pred en TRUE
+conservaremos las predicciones del conjunto de evaluación y podremos acceder a
+ellas mediante `collect_predictions()` .
+
+```{r}
+grid_ctrl <- control_grid(
+      save_pred = TRUE,
+      parallel_over = "everything",
+      save_workflow = TRUE)
+```
+
+Ahora aplicaremos la función `workflow_map` para aplicar cada modelo a su receta
+correspondiente dentro de cada pliego (fold).
+
+
+```{r}
+# Crear un cluster con sesiones de R para agregar paralelismo
+all_cores <- detectCores(logical = FALSE)
+cl <- makePSOCKcluster(all_cores)
+registerDoParallel(cl)
+set.seed(2021)
+```
+
+
+
+```{r}
 set.seed(84432)
-kknn_tune <- tune_grid(kknn_workflow,
-  							  resamples = spam_folds,
-							  grid = 20)
+knn_tune <- tune_grid(knn_workflow,
+  							 resamples = spam_folds,
+							 control = grid_ctrl,
+							 grid = 20)
 ```
 
 
