@@ -312,40 +312,30 @@ spam.
 ## Atípicos
 
 ```{r}
-bike %>%
-	select(where(is.numeric)) %>% 
-	ggpairs(., lower = list(continuous = loess_lm),
- 		     upper = list(continuous = wrap("cor", size = 5))) + drako
+spam_longer <- spam %>% 
+	pivot_longer(cols = where(is.numeric),
+					 names_to = "variable",
+					 values_to = "valor")
+	# filter(variable %in% c("mail", "will", "all")) %>% 
+	# mutate(variable = fct_reorder2(variable, type, valor, .fun = first2, .desc = F))
 ```
 
-```{r}
-map(names(spam)[1:57], ~ spam %>%
-      group_by(type) %>% 
-      identify_outliers(.x))
 
-  set_names(names(S)[1:4]) %>% 
-  enframe() %>% 
-  unnest(value) %>%
-  arrange(name, species) %>% 
-  tabla("Atípicos por variable y especie")
-```
-
-```{r}
-map(names(iris)[1:4], ~ iris %>%
-      group_by(Species) %>% 
-      identify_outliers(.x)) %>% 
-  set_names(names(iris)[1:4]) %>% 
-  enframe() %>% 
-  unnest(value) %>%
-  arrange(name, Species) %>% 
-  tabla("Atípicos por variable y especie")
-```
 
 
 ```{r}
-spam %>% 
-	rstatix::identify_outliers(type)
+spam_longer %>% 
+	ggplot(aes(x = variable, y = valor)) +
+	geom_boxplot(outlier.color = "red") +
+	scale_y_log10() +
+	facet_grid(type ~ ., scales = "free_y") +
+	drako +
+	theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 ```
+
+
+
 
 
 
