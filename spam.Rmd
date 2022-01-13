@@ -92,6 +92,7 @@ import::from(bestNormalize, bestNormalize)
 import::from(statistigo, coloring_font)
 import::from(skimr, skim)
 import::from(parallel, detectCores, makePSOCKcluster, stopCluster)
+import::from(tidytext, reorder_within, scale_y_reordered, scale_x_reordered)
 import::from(doParallel, registerDoParallel)
 import::from(cowplot, .except = "stamp")
 import::from(kableExtra, .except = "group_rows")
@@ -311,29 +312,27 @@ spam.
 
 ## Atípicos
 
+
 ```{r}
 spam_longer <- spam %>% 
 	pivot_longer(cols = where(is.numeric),
 					 names_to = "variable",
 					 values_to = "valor")
-	# filter(variable %in% c("mail", "will", "all")) %>% 
-	# mutate(variable = fct_reorder2(variable, type, valor, .fun = first2, .desc = F))
+	# filter(valor > 0)
+	# mutate(valor = if_else(valor <= 0, abs(valor) + 1, valor))
 ```
-
-
-
 
 ```{r}
-spam_longer %>% 
-	ggplot(aes(x = variable, y = valor)) +
+ggplot(spam_longer, aes(reorder_within(variable, valor, type, fun = median), valor)) +
 	geom_boxplot(outlier.color = "red") +
+	scale_x_reordered() +
+	# scale_y_log10() +
+	scale_y_sqrt() +
 	scale_y_log10() +
-	facet_grid(type ~ ., scales = "free_y") +
+	facet_grid(type ~ ., scales = "free", space = "free") +
 	drako +
 	theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
 ```
-
 
 
 
@@ -479,6 +478,7 @@ knn_recipe_rose <- recipe(formula = type ~ ., data = spam_train) %>%
   step_normalize(all_numeric()) %>% 
   step_rose(type, skip = TRUE)
 ```
+
 
 # Modelado
 
