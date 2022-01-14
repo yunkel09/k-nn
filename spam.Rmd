@@ -305,38 +305,67 @@ spam %>%
 
 En el gráfico \@ref(fig:desbalance) observamos que la variable no está
 equilibrada. La clase `r coloring_font("**no_spam**", "#A24000")` tiene más
-casos que la clase `r coloring_font("**spam**", "#A24000")`. Si no balanceamos
+casos que la clase `r coloring_font("**spam**", "#A24000")`. **Si no balanceamos
 los datos entonces lo que pasará es que nuestro modelo aprenderá de manera muy
 eficaz sobre cómo predecir el caso negativo, es decir, cuando un correo no es
-spam.
+spam.**
 
 ## Atípicos
 
+Evaluemos la presencia de atípicos. Para esto primero excluiremos aquellas
+columna que tengan varianza próxima a cero y solo dejaremos variables que
+aporten suficiente información al modelo.
 
 ```{r}
-spam_longer <- spam %>% 
-	pivot_longer(cols = where(is.numeric),
-					 names_to = "variable",
-					 values_to = "valor")
-	# filter(valor > 0)
-	# mutate(valor = if_else(valor <= 0, abs(valor) + 1, valor))
+var_ok <- spam %>% 
+	caret::nearZeroVar(saveMetrics = T) %>% 
+	rownames_to_column("var") %>% 
+   filter(!if_any(zeroVar:nzv, ~ .x == TRUE)) %>% 
+   pull(var)
+```
+
+Debido a que las variables están en diferentes magnitudes y lo que nos interesa
+es evaluar la presencia de atípicos, realizaremos una transformación a los
+valores utilizando la **transformación del logaritmo ajustado.** $log(Y + 1)$.
+De esta forma los valores con 1 se convertirán en cero al aplicar el logaritmo.
+
+```{r}
+sl <- spam %>% 
+	select(all_of(var_ok)) %>% 
+	mutate(across(is.numeric, ~ log(.x + 1)))
 ```
 
 ```{r}
-ggplot(spam_longer, aes(reorder_within(variable, valor, type, fun = median), valor)) +
+slice_sample(sl, n = 5)
+```
+
+<p class="comment">
+Para graficar no será suficiente la transformación logarítmica, así que
+aplicaremos una segunda transformación a nivel del eje Y. Esto nos permitirá ver
+de forma ordenada las variables con información que tienen atípicos separada
+por cada uno de los distintos tipos de correo.
+</p>
+
+```{r, fig.width=11, fig.asp=0.8}
+sl %>% 
+	pivot_longer(cols = where(is.numeric),
+					 names_to = "variable",
+					 values_to = "valor") %>% 
+	ggplot(aes(reorder_within(variable, valor, type, fun = median), valor)) +
 	geom_boxplot(outlier.color = "red") +
-	scale_x_reordered() +
-	# scale_y_log10() +
-	scale_y_sqrt() +
+	scale_x_reordered(name = "Métrica") +
 	scale_y_log10() +
 	facet_grid(type ~ ., scales = "free", space = "free") +
 	drako +
-	theme(axis.text.x = element_text(angle = 90, hjust = 1))
+	theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+	labs(title = "Atípicos con variables informativas", 
+		  subtitle = "Doble escala logarítmica")
 ```
 
-
-
-
+<p class="comment">
+El tratamiento de atípicos puede mejorarse a través de una técnica llamada
+*spatial sign* [@kuhn_applied_2013 pag. 71-72]
+</p>
 
 # Split
 
@@ -350,10 +379,11 @@ spam_test  <- testing(spam_split)
 dim(spam_train) # 70% para entrenamiento
 ```
 
-## CV
+## Cross-Validación
 
-Debido a que tenemos una muestra relativamente grande un CV con 10 K-fold será
-suficiente para obtener buenas propiedades de bias y varianza.
+Debido a que tenemos una muestra relativamente grande^[Definir que es grande y
+que es pequeño es difícil] un CV con 10 K-fold será suficiente para obtener
+**buenas propiedades de bias y varianza.**
 
 ```{r}
 set.seed(2021)
@@ -370,18 +400,37 @@ Lo que haremos en general será:
 * Balancear los datos con distintos métodos.
 * Remover variables que tengan cero varianza o varianza próxima a cero.
 * Centrar y escalar
+* Solo en una receta aplicaremos tratamiento a los atípicos.
 
 Antes de realizar este procedimiento, validemos cuantas variables quedarían
 después de remover las variables tienen varianza cero o próxima a cero.
 
 ```{r}
-recipe(formula = type ~ ., data = spam_train) %>% 
+pdr <- recipe(formula = type ~ ., data = spam_train) %>% 
   step_nzv(all_predictors()) %>%
-  prep() %>% 
-  summary()
+  prep() %>% juice()
+```
+
+```{r}
+slice_sample(pdr, n = 5)
 ```
 
 Vemos que solo quedan 9 predictores.
+
+Revisemos si al remover la varianza cercana a cero los resultados de las
+funciones de {caret} y {tidymodels} son iguales:
+
+```{r}
+setdiff(names(pdr), names(sl))
+```
+
+Vemos que hay una diferencia con la función `caret::nearZeroVar()` en cuanto a
+la cantidad de columnas que filtra versus `step_nzv()`.  Al revisar la
+documentación de ambas funciones vemos que los valores por defecto son los
+mismos, así que la razón obedece a que `step_nzv()` se está aplicando al
+conjunto de entrenamiento y la función de {caret} a todo el conjunto original de
+datos.
+
 
 Ahora veamos que pasa si solo queremos retirar aquellas que tengan estrictamente
 varianza cero:
@@ -417,7 +466,7 @@ convexa de las dos instancias elegidas a y b.
 knn_recipe_smote <- recipe(formula = type ~ ., data = spam_train) %>% 
   step_nzv(all_predictors()) %>%
   step_normalize(all_numeric()) %>% 
-  step_smote(type, skip = TRUE) 
+  step_smote(type, skip = TRUE)
 ```
 
 Veamos como quedó esta receta a nivel de dataset:
@@ -425,7 +474,8 @@ Veamos como quedó esta receta a nivel de dataset:
 ```{r}
 knn_recipe_smote %>%
 	prep() %>%
-	juice()
+	juice() %>% 
+	slice_sample(n = 4)
 ```
 
 Vemos que, a como habíamos previsto, que la función `step_nzv()` excluyó 48
@@ -439,6 +489,16 @@ knn_recipe_smote %>%
 	prep() %>%
 	juice() %>% 
 	barra(type) + labs("Clasificación Balanceada")
+```
+
+### Atípicos
+
+Utilizaremos una receta con un paso adicional denominado *spatial sign* el
+cual, según [@johnson_63_nodate]
+
+```{r}
+knn_recipe_smote_out <- knn_recipe_smote %>% 
+  step_spatialsign(all_predictors())
 ```
 
 ## Submuestreo
@@ -479,8 +539,9 @@ knn_recipe_rose <- recipe(formula = type ~ ., data = spam_train) %>%
   step_rose(type, skip = TRUE)
 ```
 
-
 # Modelado
+
+## KNN
 
 ```{r}
 knn_spec <- nearest_neighbor(neighbors = tune(),   # este es la cantidad de vecinos k a estimar
@@ -489,22 +550,60 @@ knn_spec <- nearest_neighbor(neighbors = tune(),   # este es la cantidad de veci
   set_engine("kknn")
 ```
 
+## SVM
+
+El modelo `svm_rbf()` utiliza una **función no lineal**, específicamente una
+función kernel radial, para crear el límite de decisión. 
+
 ```{r}
-preprocesadores_knn <- list(knn_smote = knn_recipe_smote, 
-									 knn_submu = knn_recipe_submuestreo,
-									 knn_sobre = knn_recipe_sobremuestreo,
-									 knn_rosex = knn_recipe_rose)
+svm_r_spec <- svm_rbf(cost = tune(), rbf_sigma = tune()) %>% 
+  set_engine("kernlab") %>% 
+  set_mode("classification")
 ```
 
 
-```{r}
-modelo_knn <- list(knn = knn_spec)
-```
 
+## Workflow
 
 ```{r}
-spam_workflow <- workflow_set(preprocesadores_knn, modelo_knn)
+preprocesadores_knn <- list(smote = knn_recipe_smote, 
+									 smout = knn_recipe_smote_out, 
+									 submu = knn_recipe_submuestreo,
+									 sobre = knn_recipe_sobremuestreo,
+									 rosex = knn_recipe_rose)
 ```
+
+Podemos aprovechar que tenemos esta lista de recetas para medir el impacto de
+los algoritmos de balanceo en cuanto a la cantidad de filas que dejan para
+ajustar el modelo
+
+```{r observaciones, paged.print = FALSE}
+preprocesadores_knn %>%
+	map(~ prep(.) %>%
+		 	juice() %>% 
+		 	nrow()) %>% 
+	enframe() %>% 
+	unnest(value) %>% 
+	arrange(desc(value)) %>% 
+	tabla(cap = "Cantidad de observaciones restantes")
+```
+
+Con base a la tabla \@ref(tab:observaciones)) vemos que el algoritmo de
+submuestreo resulta en menos observaciones que los restantes tres.
+
+```{r}
+modelos <- list(knn = knn_spec,
+					 # svm_lineal = svm_l_spec)
+					 svm_radial = svm_r_spec)
+```
+
+```{r}
+spam_workflow <- workflow_set(preproc = preprocesadores_knn, 
+										models = modelos, 
+										cross = TRUE)
+```
+
+## Cuadrícula
 
 Con la función `control_grid()` lo que haremos será retener los modelos y
 recetas ajustados. Además, cuando establecemos la opción save_pred en TRUE
@@ -521,6 +620,29 @@ grid_ctrl <- control_grid(
 Ahora aplicaremos la función `workflow_map` para aplicar cada modelo a su receta
 correspondiente dentro de cada pliego (fold).
 
+## Métricas
+
+Antes definamos el set de métricas para evaluar el modelo. En este caso,
+adicional a la precisión general, el ROC_AUC, y el estadístico
+*kappa*
+(el cual es un poco controversial^[Sobre el estadístico Kappa: [aqui](https://bit.ly/31WOsaL)])
+agregaremos la especificidad ya que con base a [@kuhn_applied_2013 pag 347]
+
+> "En el filtrado de correo no deseado, es probable que el costo de eliminar
+erróneamente un correo electrónico importante sea más alto que permitir que un
+correo electrónico no deseado pase el filtro incorrectamente. En situaciones
+donde los costos son diferentes, es posible que la precisión no mida las
+características importantes del modelo."
+
+> "En el filtrado de spam, generalmente hay un enfoque en la **especificidad**;
+la mayoría de las personas están dispuestas a aceptar ver spam si no se eliminan
+los correos electrónicos de familiares o compañeros de trabajo."
+
+```{r}
+mset <- metric_set(accuracy, roc_auc, kap, specificity)
+```
+
+## Tuning
 
 ```{r}
 # Crear un cluster con sesiones de R para agregar paralelismo
@@ -530,17 +652,76 @@ registerDoParallel(cl)
 set.seed(2021)
 ```
 
-
-
 ```{r}
-set.seed(84432)
-knn_tune <- tune_grid(knn_workflow,
-  							 resamples = spam_folds,
-							 control = grid_ctrl,
-							 grid = 20)
+tune_res <- spam_workflow %>% 
+	workflow_map(fn = "tune_grid", 
+					 verbose = TRUE,
+					 resamples = spam_folds,
+					 control = grid_ctrl,
+					 seed = 3,
+					 metrics = mset,
+					 grid = 20)
 ```
 
+```{r}
+# muy importante detener el cluster y eliminar variables asociadas.
+stopCluster(cl)
+unregister()
+```
 
+## Evaluación
+
+```{r, paged.print = FALSE}
+tune_res
+```
+
+Veamos cuantos modelos fueron ajustados:
+
+```{r}
+nrow(collect_metrics(tune_res, summarize = FALSE))
+```
+
+```{r, rmse-train, paged.print = FALSE}
+tune_res %>%
+	rank_results(select_best = TRUE) %>% 
+	select(modelo = wflow_id, .metric, mean, rank) %>% 
+	pivot_wider(names_from = .metric, values_from = mean) %>% 
+	rename(kappa = kap) %>% 
+	tabla(cap = "Ranking de los mejores ajustes con datos de entrenamiento")
+```
+
+```{r, fig.width=13, fig.asp=0.4}
+autoplot(tune_res, select_best = TRUE) + drako
+```
+
+<p class="comment">
+Aunque el modelo `smote_knn` tiene la mejor especificidad, seleccionaremos el
+modelo SMV radial con ajuste de desbalance SMOT y tratamiento de atípicos
+(`smout_svm_radial`) debido a que el resto de sus métricas son mejores.
+</p>
+
+
+(ref:valoresx) Mejores valores de la función de costo y sigma
+
+```{r, valoresx, fig.cap='(ref:valoresx)', fig.width=11, fig.asp=0.6}
+autoplot(tune_res, select_best = TRUE, id = "smout_svm_radial") + 
+	labs(title = "SVM con Balanceo SMOT", 
+		  subtitle = "Tratamiento de atípicos con algoritmo Spatial Sign") +
+	drako +
+	scale_x_continuous(breaks = seq(-10, 5, 1)) +
+	scale_y_continuous(limits = c(0, 1))
+
+```
+
+```{r}
+tune_res %>% 
+   extract_workflow_set_result("smout_svm_radial") %>% 
+	select_best(metric = "specificity")
+```
+
+En la figura \@ref(fig:valoresx) en el cuadrante de especificidad vemos el valor óptimo de la función de
+costo el cual con esta mayor penalización se reduce la probabilidad de clasificación
+errónea.  También vemos que la función sigma (o gamma whatever)
 
 # Referencias
 
