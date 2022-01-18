@@ -47,35 +47,35 @@ Datos spam. Se desea realizar un modelo para clasificar si un correo se puede
 considerar spam o no. Se nos proporciona un conjunto de datos con 4.601
 observaciones y 58 variables, donde la variable type es la variable a predecir.
 
-Realice los siguientes pasos: 
+Realice los siguientes pasos:
 
-1. Realice el proceso de pre-procesado. Divida el conjunto de datos en 70% para
-el conjunto de entrenamiento y 30% para el conjunto de validación.
+1.  Realice el proceso de pre-procesado. Divida el conjunto de datos en 70%
+    para el conjunto de entrenamiento y 30% para el conjunto de validación.
 
-2. Realice un modelo de K vecinos más cercanos con la K óptima. Pruebe con 20
-valores distintos de k y obtenga la evolución del Accuracy en función de la K,
-seleccionando la k óptima. Utilice el modelo para predecir sobre el conjunto de
-validación.
+2.  Realice un modelo de K vecinos más cercanos con la K óptima. Pruebe con 20
+    valores distintos de k y obtenga la evolución del Accuracy en función de la
+    K, seleccionando la k óptima. Utilice el modelo para predecir sobre el
+    conjunto de validación.
 
-3. Realice un modelo de Super Vector Machine con distintos kernels (lineal,
-polinómico y radial). Utilice el modelo para predecir sobre el conjunto de
-validación
+3.  Realice un modelo de Super Vector Machine con distintos kernels (lineal,
+    polinómico y radial). Utilice el modelo para predecir sobre el conjunto de
+    validación
 
-4. Obtenga el AUC del modelo de Knn y SVM ¿Cuál de los dos modelos podemos
-considerar que es mejor en función del AUC? (para calcular el AUC deberá
-transformar las predicciones a numéricas con la función ifelse()).
+4.  Obtenga el AUC del modelo de Knn y SVM ¿Cuál de los dos modelos podemos
+    considerar que es mejor en función del AUC? (para calcular el AUC deberá
+    transformar las predicciones a numéricas con la función ifelse()).
 
-Interprete los resultados. Los datos se encuentran dentro de la librería kernlab
-que debemos instalar (install.packages()) y cargar (library()). Para cargar los
-datos se debe utilizar data(spam).
+Interprete los resultados. Los datos se encuentran dentro de la librería
+kernlab que debemos instalar (install.packages()) y cargar (library()). Para
+cargar los datos se debe utilizar data(spam).
 
 Descripción del conjunto de datos:
 
-* Conjunto de datos recopilados en Hewlett-Packard Labs, que clasifica los
-correos electrónicos 4601 como spam o no spam. Las primeras 57 variables nos
-indican la frecuencia de ciertas palabras y caracteres en el correo electrónico
-y la variable número 58 (type) clasifica el correo como spam o no.
-
+-   Conjunto de datos recopilados en Hewlett-Packard Labs, que clasifica los
+    correos electrónicos 4601 como spam o no spam. Las primeras 57 variables
+    nos indican la frecuencia de ciertas palabras y caracteres en el correo
+    electrónico y la variable número 58 (type) clasifica el correo como spam o
+    no.
 
 ## Paquetes
 
@@ -104,7 +104,6 @@ pacman::p_load(janitor, themis, usemodels, tidymodels, tidyverse)
 
 ## Funciones
 
-
 ```{r}
 tabla <- function(df, cap = "prueba") {
   
@@ -130,6 +129,7 @@ unregister <- function() {
 ```
 
 <!-- #56B4E9 -->
+
 <!-- #D55E00 -->
 
 ```{r}
@@ -180,15 +180,15 @@ sobreestimación. En palabras simples, se incurre en más penalización cuando e
 valor predicho es menor que el valor real. Por otro lado, se incurre en menos
 penalización cuando el valor predicho es mayor que el valor real.
 
-Esto es especialmente útil para casos en los que la subestimación de la variable
-objetivo no es aceptable, pero se puede tolerar la sobreestimación.
+Esto es especialmente útil para casos en los que la subestimación de la
+variable objetivo no es aceptable, pero se puede tolerar la sobreestimación.
 
 Supongamos que sobrestimamos la renta de bicicletas, el adminstrador puede
-tener más bicicletas disponibles para atender la demanda suponiendo que el costo
-de mantener más bicicletas es menor que el costo de no rentarlas.  El problema
-se daría si la cantidad de bicicletas predichas es menor, en este caso es
-probable que el administrador pierda dinero por no tener suficientes bicicletas
-para suplir la demanda.
+tener más bicicletas disponibles para atender la demanda suponiendo que el
+costo de mantener más bicicletas es menor que el costo de no rentarlas. El
+problema se daría si la cantidad de bicicletas predichas es menor, en este caso
+es probable que el administrador pierda dinero por no tener suficientes
+bicicletas para suplir la demanda.
 
 ```{r}
 # métrica rmsle
@@ -262,10 +262,19 @@ spam <- data("spam", package = "kernlab") %>%
 
 <!-- https://bit.ly/31D95c4 -->
 
+```{=html}
 <!-- ~ 7% de error de clasificación errónea. Los falsos positivos (marcar un
-buen --> <!-- correo como spam) son muy indeseables. Si insistimos en cero
-falsos positivos en --> <!-- el conjunto de entrenamiento / prueba, el 20-25%
-del spam pasó a través del --> <!-- filtro. -->
+buen -->
+```
+```{=html}
+<!-- correo como spam) son muy indeseables. Si insistimos en cero
+falsos positivos en -->
+```
+```{=html}
+<!-- el conjunto de entrenamiento / prueba, el 20-25%
+del spam pasó a través del -->
+```
+<!-- filtro. -->
 
 # Análisis Exploratorio
 
@@ -295,7 +304,10 @@ Vemos que la variable respuesta presenta un desbalance con 2788 casos para
 
 ## Variables dependiente
 
-(ref:desbalance) El desafío de trabajar con conjuntos de datos desequilibrados es que la mayoría de las técnicas de aprendizaje automático ignorarán y, a su vez, tendrán un rendimiento deficiente en la clase minoritaria, aunque normalmente lo más importante es el rendimiento en la clase minoritaria.
+(ref:desbalance) El desafío de trabajar con conjuntos de datos desequilibrados
+es que la mayoría de las técnicas de aprendizaje automático ignorarán y, a su
+vez, tendrán un rendimiento deficiente en la clase minoritaria, aunque
+normalmente lo más importante es el rendimiento en la clase minoritaria.
 
 ```{r, desbalance, fig.cap='(ref:desbalance)'}
 spam %>% 
@@ -305,10 +317,10 @@ spam %>%
 
 En el gráfico \@ref(fig:desbalance) observamos que la variable no está
 equilibrada. La clase `r coloring_font("**no_spam**", "#A24000")` tiene más
-casos que la clase `r coloring_font("**spam**", "#A24000")`. **Si no balanceamos
-los datos entonces lo que pasará es que nuestro modelo aprenderá de manera muy
-eficaz sobre cómo predecir el caso negativo, es decir, cuando un correo no es
-spam.**
+casos que la clase `r coloring_font("**spam**", "#A24000")`. **Si no
+balanceamos los datos entonces lo que pasará es que nuestro modelo aprenderá de
+manera muy eficaz sobre cómo predecir el caso negativo, es decir, cuando un
+correo no es spam.**
 
 ## Atípicos
 
@@ -340,10 +352,12 @@ slice_sample(sl, n = 5)
 ```
 
 <p class="comment">
+
 Para graficar no será suficiente la transformación logarítmica, así que
-aplicaremos una segunda transformación a nivel del eje Y. Esto nos permitirá ver
-de forma ordenada las variables con información que tienen atípicos separada
-por cada uno de los distintos tipos de correo.
+aplicaremos una segunda transformación a nivel del eje Y. Esto nos permitirá
+ver de forma ordenada las variables con información que tienen atípicos
+separada por cada uno de los distintos tipos de correo.
+
 </p>
 
 ```{r, fig.width=11, fig.asp=0.8}
@@ -363,8 +377,10 @@ sl %>%
 ```
 
 <p class="comment">
+
 El tratamiento de atípicos puede mejorarse a través de una técnica llamada
-*spatial sign* [@kuhn_applied_2013 pag. 71-72]
+*spatial sign* \[@kuhn_applied_2013 pag. 71-72\]
+
 </p>
 
 # Split
@@ -381,9 +397,10 @@ dim(spam_train) # 70% para entrenamiento
 
 ## Cross-Validación
 
-Debido a que tenemos una muestra relativamente grande^[Definir que es grande y
-que es pequeño es difícil] un CV con 10 K-fold será suficiente para obtener
-**buenas propiedades de bias y varianza.**
+Debido a que tenemos una muestra relativamente grande[^1] un CV con 10 K-fold
+será suficiente para obtener **buenas propiedades de bias y varianza.**
+
+[^1]: Definir que es grande y que es pequeño es difícil
 
 ```{r}
 set.seed(2021)
@@ -397,10 +414,10 @@ a corregir el desequilibrio entre las distintas clases.
 
 Lo que haremos en general será:
 
-* Balancear los datos con distintos métodos.
-* Remover variables que tengan cero varianza o varianza próxima a cero.
-* Centrar y escalar
-* Solo en una receta aplicaremos tratamiento a los atípicos.
+-   Balancear los datos con distintos métodos.
+-   Remover variables que tengan cero varianza o varianza próxima a cero.
+-   Centrar y escalar
+-   Solo en una receta aplicaremos tratamiento a los atípicos.
 
 Antes de realizar este procedimiento, validemos cuantas variables quedarían
 después de remover las variables tienen varianza cero o próxima a cero.
@@ -425,15 +442,14 @@ setdiff(names(pdr), names(sl))
 ```
 
 Vemos que hay una diferencia con la función `caret::nearZeroVar()` en cuanto a
-la cantidad de columnas que filtra versus `step_nzv()`.  Al revisar la
+la cantidad de columnas que filtra versus `step_nzv()`. Al revisar la
 documentación de ambas funciones vemos que los valores por defecto son los
 mismos, así que la razón obedece a que `step_nzv()` se está aplicando al
-conjunto de entrenamiento y la función de {caret} a todo el conjunto original de
-datos.
+conjunto de entrenamiento y la función de {caret} a todo el conjunto original
+de datos.
 
-
-Ahora veamos que pasa si solo queremos retirar aquellas que tengan estrictamente
-varianza cero:
+Ahora veamos que pasa si solo queremos retirar aquellas que tengan
+estrictamente varianza cero:
 
 ```{r}
 recipe(formula = type ~ ., data = spam_train) %>% 
@@ -442,10 +458,9 @@ recipe(formula = type ~ ., data = spam_train) %>%
   summary()
 ```
 
-No hay ninguna variable que tenga varianza cero exacta.  Lo que haremos
-será dejar una receta que contemple todos los predictores y seleccionaremos
-un único método de balanceo, porque sino, tendríamos demasiadas recetas que
-probar.
+No hay ninguna variable que tenga varianza cero exacta. Lo que haremos será
+dejar una receta que contemple todos los predictores y seleccionaremos un único
+método de balanceo, porque sino, tendríamos demasiadas recetas que probar.
 
 ## SMOTE
 
@@ -479,10 +494,12 @@ knn_recipe_smote %>%
 ```
 
 Vemos que, a como habíamos previsto, que la función `step_nzv()` excluyó 48
-predictores debido a que tienen varianza próxima a cero, quedando únicamente
-9 predictores más la respuesta.
+predictores debido a que tienen varianza próxima a cero, quedando únicamente 9
+predictores más la respuesta.
 
-(ref:smot) Realiza un sobremuestreo en el que la clase minoritaria se sobremuestrea creando ejemplos "sintéticos" en lugar de sobremuestrear con reemplazo.
+(ref:smot) Realiza un sobremuestreo en el que la clase minoritaria se
+sobremuestrea creando ejemplos "sintéticos" en lugar de sobremuestrear con
+reemplazo.
 
 ```{r smot, fig.cap='(ref:smot)'}
 knn_recipe_smote %>%
@@ -503,13 +520,13 @@ knn_recipe_smote_out <- knn_recipe_smote %>%
 
 ## Submuestreo
 
-Recordemos que en tidymodels las recetas de preprocesamiento que se apliquen
-a los datos de entrenamiento luego se aplican a los datos de prueba.  En el caso
+Recordemos que en tidymodels las recetas de preprocesamiento que se apliquen a
+los datos de entrenamiento luego se aplican a los datos de prueba. En el caso
 de pasos (*steps*) de pre-procesamiento que realizan sobre-muestreo o
 sub-muestreo es muy importante que este paso **no se aplique a los datos que
-estamos pronosticando**.  Por esta razón cuando usemos recetas debemos utilizar
-una opción llamada  `skip = TRUE`  para que se  ignore este paso en la fase
-de predicción (e.g con `predict()`).  
+estamos pronosticando**. Por esta razón cuando usemos recetas debemos utilizar
+una opción llamada `skip = TRUE` para que se ignore este paso en la fase de
+predicción (e.g con `predict()`).
 
 La idea principal es aislar los pasos de pre-procesamiento que podrían causar
 errores si se aplican a nuevas muestras (e.g set de prueba).
@@ -552,16 +569,20 @@ knn_spec <- nearest_neighbor(neighbors = tune(),   # este es la cantidad de veci
 
 ## SVM
 
+```{r}
+svm_l_spec <- svm_linear(cost = (), )
+```
+
+
+
 El modelo `svm_rbf()` utiliza una **función no lineal**, específicamente una
-función kernel radial, para crear el límite de decisión. 
+función kernel radial, para crear el límite de decisión.
 
 ```{r}
 svm_r_spec <- svm_rbf(cost = tune(), rbf_sigma = tune()) %>% 
   set_engine("kernlab") %>% 
   set_mode("classification")
 ```
-
-
 
 ## Workflow
 
@@ -617,26 +638,27 @@ grid_ctrl <- control_grid(
       save_workflow = TRUE)
 ```
 
-Ahora aplicaremos la función `workflow_map` para aplicar cada modelo a su receta
-correspondiente dentro de cada pliego (fold).
+Ahora aplicaremos la función `workflow_map` para aplicar cada modelo a su
+receta correspondiente dentro de cada pliego (fold).
 
 ## Métricas
 
 Antes definamos el set de métricas para evaluar el modelo. En este caso,
-adicional a la precisión general, el ROC_AUC, y el estadístico
-*kappa*
-(el cual es un poco controversial^[Sobre el estadístico Kappa: [aqui](https://bit.ly/31WOsaL)])
-agregaremos la especificidad ya que con base a [@kuhn_applied_2013 pag 347]
+adicional a la precisión general, el ROC_AUC, y el estadístico *kappa* (el cual
+es un poco controversial[^2]) agregaremos la especificidad ya que con base a
+\[@kuhn_applied_2013 pag 347\]
+
+[^2]: Sobre el estadístico Kappa: [aqui](https://bit.ly/31WOsaL)
 
 > "En el filtrado de correo no deseado, es probable que el costo de eliminar
-erróneamente un correo electrónico importante sea más alto que permitir que un
-correo electrónico no deseado pase el filtro incorrectamente. En situaciones
-donde los costos son diferentes, es posible que la precisión no mida las
-características importantes del modelo."
+> erróneamente un correo electrónico importante sea más alto que permitir que
+> un correo electrónico no deseado pase el filtro incorrectamente. En
+> situaciones donde los costos son diferentes, es posible que la precisión no
+> mida las características importantes del modelo."
 
 > "En el filtrado de spam, generalmente hay un enfoque en la **especificidad**;
-la mayoría de las personas están dispuestas a aceptar ver spam si no se eliminan
-los correos electrónicos de familiares o compañeros de trabajo."
+> la mayoría de las personas están dispuestas a aceptar ver spam si no se
+> eliminan los correos electrónicos de familiares o compañeros de trabajo."
 
 ```{r}
 mset <- metric_set(accuracy, roc_auc, kap, specificity)
@@ -695,11 +717,12 @@ autoplot(tune_res, select_best = TRUE) + drako
 ```
 
 <p class="comment">
+
 Aunque el modelo `smote_knn` tiene la mejor especificidad, seleccionaremos el
 modelo SMV radial con ajuste de desbalance SMOT y tratamiento de atípicos
 (`smout_svm_radial`) debido a que el resto de sus métricas son mejores.
-</p>
 
+</p>
 
 (ref:valoresx) Mejores valores de la función de costo y sigma
 
@@ -719,37 +742,9 @@ tune_res %>%
 	select_best(metric = "specificity")
 ```
 
-En la figura \@ref(fig:valoresx) en el cuadrante de especificidad vemos el valor óptimo de la función de
-costo el cual con esta mayor penalización se reduce la probabilidad de clasificación
-errónea.  También vemos que la función sigma (o gamma whatever)
+En la figura \@ref(fig:valoresx) en el cuadrante de especificidad vemos el
+valor óptimo de la función de costo el cual con esta mayor penalización se
+reduce la probabilidad de clasificación errónea. También vemos que la función
+sigma (o gamma whatever)
 
 # Referencias
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
