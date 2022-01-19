@@ -88,7 +88,7 @@ options(warn = -1,
 
 ```{r}
 import::from(statistigo, coloring_font)
-import::from(bestNormalize, bestNormalize)
+import::from(finetune, control_race)
 import::from(statistigo, coloring_font)
 import::from(skimr, skim)
 import::from(parallel, detectCores, makePSOCKcluster, stopCluster)
@@ -478,7 +478,7 @@ características. Las instancias sintéticas se generan como una combinación
 convexa de las dos instancias elegidas a y b.
 
 ```{r}
-knn_recipe_smote <- recipe(formula = type ~ ., data = spam_train) %>% 
+receta_smote <- recipe(formula = type ~ ., data = spam_train) %>% 
   step_nzv(all_predictors()) %>%
   step_normalize(all_numeric()) %>% 
   step_smote(type, skip = TRUE)
@@ -487,7 +487,7 @@ knn_recipe_smote <- recipe(formula = type ~ ., data = spam_train) %>%
 Veamos como quedó esta receta a nivel de dataset:
 
 ```{r}
-knn_recipe_smote %>%
+receta_smote %>%
 	prep() %>%
 	juice() %>% 
 	slice_sample(n = 4)
@@ -497,12 +497,12 @@ Vemos que, a como habíamos previsto, que la función `step_nzv()` excluyó 48
 predictores debido a que tienen varianza próxima a cero, quedando únicamente 9
 predictores más la respuesta.
 
-(ref:smot) Realiza un sobremuestreo en el que la clase minoritaria se
+(ref:smot) Realiza un sobre muestreo en el que la clase minoritaria se
 sobremuestrea creando ejemplos "sintéticos" en lugar de sobremuestrear con
 reemplazo.
 
 ```{r smot, fig.cap='(ref:smot)'}
-knn_recipe_smote %>%
+receta_smote %>%
 	prep() %>%
 	juice() %>% 
 	barra(type) + labs("Clasificación Balanceada")
@@ -514,7 +514,7 @@ Utilizaremos una receta con un paso adicional denominado *spatial sign* el
 cual, según [@johnson_63_nodate]
 
 ```{r}
-knn_recipe_smote_out <- knn_recipe_smote %>% 
+receta_smote_outliers <- receta_smote %>% 
   step_spatialsign(all_predictors())
 ```
 
@@ -532,7 +532,7 @@ La idea principal es aislar los pasos de pre-procesamiento que podrían causar
 errores si se aplican a nuevas muestras (e.g set de prueba).
 
 ```{r}
-knn_recipe_submuestreo <- recipe(formula = type ~ ., data = spam_train) %>% 
+receta_submuestreo <- recipe(formula = type ~ ., data = spam_train) %>% 
   step_nzv(all_predictors()) %>% 
   step_normalize(all_numeric()) %>% 
   step_downsample(type, skip = TRUE)
@@ -541,7 +541,7 @@ knn_recipe_submuestreo <- recipe(formula = type ~ ., data = spam_train) %>%
 ## Sobremuestreo
 
 ```{r}
-knn_recipe_sobremuestreo <- recipe(formula = type ~ ., data = spam_train) %>% 
+receta_sobremuestreo <- recipe(formula = type ~ ., data = spam_train) %>% 
   step_nzv(all_predictors()) %>% 
   step_normalize(all_numeric()) %>% 
   step_upsample(type, skip = TRUE)
@@ -550,7 +550,7 @@ knn_recipe_sobremuestreo <- recipe(formula = type ~ ., data = spam_train) %>%
 ## ROSE
 
 ```{r}
-knn_recipe_rose <- recipe(formula = type ~ ., data = spam_train) %>% 
+receta_rose <- recipe(formula = type ~ ., data = spam_train) %>% 
   step_nzv(all_predictors()) %>% 
   step_normalize(all_numeric()) %>% 
   step_rose(type, skip = TRUE)
@@ -561,7 +561,7 @@ knn_recipe_rose <- recipe(formula = type ~ ., data = spam_train) %>%
 ## KNN
 
 ```{r}
-knn_spec <- nearest_neighbor(neighbors = tune(),   # este es la cantidad de vecinos k a estimar
+knn_kknn <- nearest_neighbor(neighbors   = tune(),   # este es la cantidad de vecinos k a estimar
 									  weight_func = tune()) %>% 
   set_mode("classification") %>% 
   set_engine("kknn")
@@ -570,16 +570,19 @@ knn_spec <- nearest_neighbor(neighbors = tune(),   # este es la cantidad de veci
 ## SVM
 
 ```{r}
-svm_l_spec <- svm_linear(cost = (), )
+svm_l_liblinear <- svm_linear() %>%
+	set_mode("classification") %>%
+	set_engine("LiblineaR")
 ```
 
-
-
-El modelo `svm_rbf()` utiliza una **función no lineal**, específicamente una
-función kernel radial, para crear el límite de decisión.
+```{r}
+svm_l_kernlab <- svm_linear() %>%
+	set_mode("classification") %>%
+	set_engine("kernlab")
+```
 
 ```{r}
-svm_r_spec <- svm_rbf(cost = tune(), rbf_sigma = tune()) %>% 
+svm_r_kernlab <- svm_rbf(cost = tune(), rbf_sigma = tune()) %>% 
   set_engine("kernlab") %>% 
   set_mode("classification")
 ```
@@ -587,11 +590,11 @@ svm_r_spec <- svm_rbf(cost = tune(), rbf_sigma = tune()) %>%
 ## Workflow
 
 ```{r}
-preprocesadores_knn <- list(smote = knn_recipe_smote, 
-									 smout = knn_recipe_smote_out, 
-									 submu = knn_recipe_submuestreo,
-									 sobre = knn_recipe_sobremuestreo,
-									 rosex = knn_recipe_rose)
+preprocesadores <- list(smote_simple  = receta_smote, 
+								smote_outlier = receta_smote_outliers, 
+								submuestreo   = receta_submuestreo,
+								sobremuestreo = receta_sobremuestreo,
+								rose          = receta_rose)
 ```
 
 Podemos aprovechar que tenemos esta lista de recetas para medir el impacto de
@@ -599,7 +602,7 @@ los algoritmos de balanceo en cuanto a la cantidad de filas que dejan para
 ajustar el modelo
 
 ```{r observaciones, paged.print = FALSE}
-preprocesadores_knn %>%
+preprocesadores %>%
 	map(~ prep(.) %>%
 		 	juice() %>% 
 		 	nrow()) %>% 
@@ -613,13 +616,18 @@ Con base a la tabla \@ref(tab:observaciones)) vemos que el algoritmo de
 submuestreo resulta en menos observaciones que los restantes tres.
 
 ```{r}
-modelos <- list(knn = knn_spec,
-					 # svm_lineal = svm_l_spec)
-					 svm_radial = svm_r_spec)
+modelos <- list(knn             = knn_kknn,
+					 svm_l_liblinear = svm_l_liblinear,
+					 svm_l_kernlab   = svm_l_kernlab,
+					 svm_r_kernlab   = svm_r_kernlab)
 ```
 
+
+
+
+
 ```{r}
-spam_workflow <- workflow_set(preproc = preprocesadores_knn, 
+spam_workflow <- workflow_set(preproc = preprocesadores, 
 										models = modelos, 
 										cross = TRUE)
 ```
@@ -661,7 +669,7 @@ es un poco controversial[^2]) agregaremos la especificidad ya que con base a
 > eliminan los correos electrónicos de familiares o compañeros de trabajo."
 
 ```{r}
-mset <- metric_set(accuracy, roc_auc, kap, specificity)
+mset_01 <- metric_set(accuracy, kap, specificity)
 ```
 
 ## Tuning
@@ -681,14 +689,8 @@ tune_res <- spam_workflow %>%
 					 resamples = spam_folds,
 					 control = grid_ctrl,
 					 seed = 3,
-					 metrics = mset,
+					 metrics = mset_01,
 					 grid = 20)
-```
-
-```{r}
-# muy importante detener el cluster y eliminar variables asociadas.
-stopCluster(cl)
-unregister()
 ```
 
 ## Evaluación
@@ -704,7 +706,96 @@ nrow(collect_metrics(tune_res, summarize = FALSE))
 ```
 
 ```{r, rmse-train, paged.print = FALSE}
-tune_res %>%
+tune_rank <- tune_res %>%
+	rank_results(select_best = TRUE) %>% 
+	select(modelo = wflow_id, .metric, mean, rank) %>% 
+	pivot_wider(names_from = .metric, values_from = mean) %>% 
+	rename(kappa = kap)
+```
+
+
+```{r, rmse-train, paged.print = FALSE}
+tune_rank %>% 
+	tabla(cap = "Ranking de los mejores ajustes con datos de entrenamiento")
+```
+
+```{r, modelos, fig.width=13, fig.asp=0.4}
+autoplot(tune_res, select_best = TRUE) + drako
+```
+
+<p class="comment">
+En la tabla \@ref(tab:modelos) vemos más de 20 combinaciones de modelos con
+diferentes motores y algoritmos de balanceo. En vista de que los mejores modelos
+en términos de especificidad tienen la capacidad de devolver predicciones de
+tipo continua (probabilidades), realizaremos un reajuste, pero esta vez
+incluiremos métricas de tipo *probs* y *class*.  Esto lo hacemos de esta manera
+debido a que no es posible realizar el *tuning* de hiperparámetros de manera
+simultánea entre modelos cuando alguno de los motores (ej. LiblineaR) solo tiene
+la capacidad de devolver un tipo de predicción (ej. solo predicciones de clase).
+Si lo hacemos genera un error ya que workflow_map intenta aplicar todas las
+métricas a todos los modelos.  Otro enfoque podría ser ajustar los modelos
+por separado, pero es menos eficiente en cuanto a cantidad de código.
+</p>
+
+Primero seleccionemos los tres mejores modelos
+
+```{r}
+top_3 <- tune_rank %>% 
+	slice(1:3) %>% 
+	pull(modelo)
+```
+
+A partir del workflow original, filtremos estos únicos modelos
+
+```{r}
+curated_workflow <- spam_workflow %>% 
+	filter(wflow_id %in% top_3)
+```
+
+Definamos un set de métricas que incluya una métrica de probabilidades: ROC AUC
+
+```{r}
+mset_02 <- metric_set(roc_auc, accuracy, kap, specificity)
+```
+
+Para acelerar aun más el proceso, esta vez utilicemos el método de carrera
+para la búsqueda en cuadrícula.
+
+```{r}
+race_ctrl <- control_race(
+      save_pred     = TRUE,
+      parallel_over = "everything",
+      save_workflow = TRUE)
+```
+
+Realicemos un reajuste nuevamente solo con estos tres modelos y con el método
+de carrera.
+
+```{r}
+full_results_time <- system.time(
+		tune_res2 <- curated_workflow %>% 
+			workflow_map(fn        = "tune_race_anova",
+							 verbose   = TRUE,
+							 resamples = spam_folds,
+							 control   = race_ctrl,
+							 seed      = 2021,
+							 metrics   = mset_02,
+							 grid      = 20)
+)
+```
+
+```{r}
+# muy importante detener el cluster y eliminar variables asociadas.
+stopCluster(cl)
+unregister()
+```
+
+```{r}
+nrow(collect_metrics(tune_res2, summarize = FALSE))
+```
+
+```{r, conroc, paged.print = FALSE}
+tune_res2 %>%
 	rank_results(select_best = TRUE) %>% 
 	select(modelo = wflow_id, .metric, mean, rank) %>% 
 	pivot_wider(names_from = .metric, values_from = mean) %>% 
@@ -712,9 +803,11 @@ tune_res %>%
 	tabla(cap = "Ranking de los mejores ajustes con datos de entrenamiento")
 ```
 
-```{r, fig.width=13, fig.asp=0.4}
-autoplot(tune_res, select_best = TRUE) + drako
+
+```{r, segunda-vuelta, fig.width=13, fig.asp=0.4}
+autoplot(tune_res2, select_best = TRUE) + drako
 ```
+
 
 <p class="comment">
 
