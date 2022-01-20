@@ -1,0 +1,8 @@
+file: top_res.rds
+file_size: 10922579
+pin_hash: 06609e812a7a6d20
+type: rds
+title: top_3
+description: Un total de 960 modelos entrenados
+created: 20220120T180203Z
+api_version: 1.0
