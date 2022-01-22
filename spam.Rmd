@@ -780,7 +780,7 @@ nrow(collect_metrics(tune_res, summarize = FALSE))
 
 ```{r, paged.print = FALSE}
 tune_rank <- tune_res %>%
-	rank_results(select_best = TRUE, rank_metric = "specificity") %>% 
+	rank_results(select_best = TRUE, rank_metric = c("specificity", "kap")) %>% 
 	select(modelo = wflow_id, .metric, mean, rank) %>% 
 	pivot_wider(names_from = .metric, values_from = mean) %>% 
 	rename(kappa = kap) %>% 
@@ -799,11 +799,16 @@ tune_rank %>%
 autoplot(tune_res, select_best = TRUE) + drako
 ```
 
-<p class="comment">
+
 En la tabla \@ref(tab:modelos) y en la figura \@ref(fig:all-models) vemos 
-25 combinaciones de modelos con diferentes motores y algoritmos de balanceo. En
-vista de que los mejores modelos en términos de especificidad tienen la
-capacidad de devolver predicciones de tipo continua (probabilidades),
+`r nrow(tune_rank)` combinaciones de modelos con diferentes motores y algoritmos
+de balanceo. 
+
+<p class="comment">
+Lo que vemos es que al ordenar primero por especificidad y luego por kappa el
+modelo más alto del motor LiblineaR se encuentra en el 9no lugar. 
+En vista de que los mejores modelos en términos de especificidad
+tienen la capacidad de devolver predicciones de tipo continua (probabilidades),
 realizaremos un reajuste, pero esta vez incluiremos métricas de tipo *probs* y
 *class*.  Esto lo hacemos de esta manera debido a que no es posible realizar el
 *tuning* de hiperparámetros de manera simultánea entre modelos cuando alguno de
@@ -831,9 +836,10 @@ top_3 <- tune_rank %>%
 A partir del workflow original, filtremos estos únicos modelos
 
 ```{r}
-curated_workflow <- spam_workflow %>% 
-	filter(wflow_id %in% top_3)
+(curated_workflow <- spam_workflow %>% 
+	filter(wflow_id %in% top_3))
 ```
+
 
 Definamos un set de métricas que incluya una métrica de probabilidades: ROC AUC
 
@@ -857,6 +863,13 @@ calibrate_tune <- curated_workflow %>%
 ```{r, echo=FALSE}
 calibrate_tune <- pin_read(board = tablero, name = "top_res")
 ```
+
+```{r, paged.print = FALSE}
+calibrate_tune
+```
+
+Vemos en la columna `r coloring_font("**result**", "#A24000")` que ya se
+encontraron los hiperparámetros óptimos.
 
 <!-- Guardar un workflow con pins -->
 
