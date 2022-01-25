@@ -101,7 +101,7 @@ import::from(kableExtra, .except = "group_rows")
 import::from(DataExplorer, plot_intro, plot_bar, plot_density)
 import::from(conectigo, cargar_fuentes)
 import::from(colorblindr, scale_color_OkabeIto)
-pacman::p_load(janitor, pins, themis, usemodels, tidymodels, tidyverse)
+pacman::p_load(formattable, janitor, pins, themis, usemodels, tidymodels, tidyverse)
 ```
 
 ## Funciones
@@ -318,8 +318,8 @@ aporten suficiente información al modelo.
 var_ok <- spam %>% 
 	nearZeroVar(saveMetrics = T) %>% 
 	rownames_to_column("var") %>% 
-   filter(!if_any(zeroVar:nzv, ~ .x == TRUE)) %>% 
-   pull(var)
+    filter(!if_any(zeroVar:nzv, ~ .x == TRUE)) %>% 
+    pull(var)
 ```
 
 Debido a que las variables están en diferentes magnitudes y lo que nos interesa
@@ -561,7 +561,7 @@ de que encuentre la *K* óptima.
 
 ```{r}
 knn_kknn <- nearest_neighbor(neighbors   = tune(),
-						weight_func = tune()) %>%
+						   weight_func = tune()) %>%
 	set_mode("classification") %>%
 	set_engine("kknn")
 ```
@@ -582,7 +582,7 @@ svm_l_kernlab <- svm_linear(cost = tune()) %>%
 
 ```{r}
 svm_p_kernlab <- svm_poly(cost   = tune(),
-						degree = tune()) %>% 
+						  degree = tune()) %>% 
   set_engine("kernlab") %>% 
   set_mode("classification")
 ```
@@ -590,7 +590,7 @@ svm_p_kernlab <- svm_poly(cost   = tune(),
 
 ```{r}
 svm_r_kernlab <- svm_rbf(cost = tune(), 
-					rbf_sigma = tune()) %>% 
+					   rbf_sigma = tune()) %>% 
   set_engine("kernlab") %>% 
   set_mode("classification")
 ```
@@ -651,8 +651,8 @@ prácticos no realizaremos este paso en SVM.
 
 ```{r}
 spam_workflow <- workflow_set(preproc = preprocesadores, 
-								models = modelos, 
-								cross = TRUE)
+							  models = modelos, 
+							  cross = TRUE)
 ```
 
 ```{r, paged.print = FALSE}
@@ -700,7 +700,7 @@ continuas de tipo probabilidad, será posible combinar predicciones de clase
 con estas últimas.
 
 ```{r}
-mset <- metric_set(roc_auc, accuracy, kap, specificity)
+mset <- metric_set(roc_auc, accuracy, kap, specificity, sensitivity)
 ```
 
 ## Tuning
@@ -716,11 +716,11 @@ set.seed(2021)
 
 ```{r, echo=FALSE}
 # corrida manual
-ruta <- fs::path_wd("06_svm_knn", "knn", "modelos")
-tablero <- board_folder(path = ruta)
+# ruta <- fs::path_wd("06_svm_knn", "knn", "modelos")
+# tablero <- board_folder(path = ruta)
 
 # corrida en knit 
-# tablero <- board_folder(path = "./modelos")
+tablero <- board_folder(path = "./modelos")
 ```
 
 ```{r, echo=FALSE}
@@ -743,11 +743,9 @@ tune_res <- spam_workflow %>%
 ```
 
 ```{r, eval=FALSE}
-# muy importante detener el cluster y eliminar variables asociadas.
 stopCluster(clusterpr)
 unregister()
 ```
-
 
 ```{r, paged.print = FALSE}
 tune_res
@@ -761,7 +759,7 @@ pin_write(board = tablero,
 			 name  = "tune_res",
 			 type  = "rds",
 			 title = "all_models",
-			 description = "9300 modelos entrenados")
+			 description = "19575 modelos entrenados")
 ```
 
 Veamos cuantos modelos fueron ajustados:
@@ -769,6 +767,9 @@ Veamos cuantos modelos fueron ajustados:
 ```{r}
 nrow(collect_metrics(tune_res, summarize = FALSE))
 ```
+
+Ahora veamos los resultados de las métricas con nuestro conjunto de
+entrenamiento.
 
 ```{r, paged.print = FALSE}
 tune_rank <- tune_res %>%
@@ -784,6 +785,8 @@ tune_rank %>%
 	tabla(cap = "Ranking de los mejores ajustes con datos de entrenamiento")
 ```
 
+Veamos esto mismo de froma gráfica.
+
 (ref:all-models) Todas las combinaciones de modelos ajustados
 
 ```{r, all-models, fig.cap='(ref:all-models)', fig.width=13, fig.asp=0.6}
@@ -791,10 +794,10 @@ autoplot(tune_res, select_best = TRUE) + drako
 ```
 
 En la tabla \@ref(tab:modelos) y en la figura \@ref(fig:all-models) vemos 
-`r nrow(tune_rank)` combinaciones de modelos con diferentes motores y algoritmos
-de balanceo. La especificidad es la proporción de ceros (nonspam) estimados
-como ceros, es decir, que proporción de correos de tipo "no spam" fueron
-clasificados correctamente como "no spam".  Esto es relevante dada la
+`r nrow(tune_rank)` combinaciones de los mejores modelos con diferentes motores y
+algoritmos de balanceo. La especificidad es la proporción de ceros (nonspam)
+estimados como ceros, es decir, que proporción de correos de tipo "no spam"
+fueron clasificados correctamente como "no spam".  Esto es relevante dada la
 preocupación de que un correo legítimo sea considerado como "spam".
 
 Seleccionemos los dos mejores modelos de cada tipo.  En este caso vamos a
@@ -808,6 +811,11 @@ al igual que la sensibilidad.
 	set_names(.))
 ```
 
+```{r}
+metricas_train <- tune_rank %>% 
+	filter(modelo %in% best) 
+```
+
 <!-- pred_nonspam .pred_spam -->
 
 ```{r}
@@ -816,7 +824,7 @@ contrasts(spam$type)
 ```
 
 Crearemos una función para flexibilizar el gráfico de AUC, aunque no sea
-posible generalizar para los datos de prueba.
+posible (por el momento) generalizar para los datos de prueba.
 
 ```{r}
 roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
@@ -861,7 +869,7 @@ roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
 					label = auc$nombre[[2]],
 					size  = 10) +
 		drako + theme(legend.position = c(0.7, 0.1)) +
-		labs(title = "AUC")
+		labs(title = "Datos de entrenamiento")
 	
 }
 ```
@@ -869,13 +877,16 @@ roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
 (ref:roc) ¿Cómo se ven las curvas de ROC para estos modelos?
 
 ```{r, roc, fig.cap='(ref:roc)', fig.width=13, fig.asp=0.7}
-roc_kear(
+roc_train <- roc_kear(
 	top_models = best,
 	wflow      = tune_res,
 	verdad     = type,
 	evto_pred  = .pred_spam,
 	nivel      = "second")
+
+roc_train
 ```
+
 
 En la figura \@ref(fig:roc) estamos evaluando la tasa de verdaderos positivos
 del evento spam.  Los valores no son tal altos debido a que seleccionamos los
@@ -947,7 +958,7 @@ info_models <- best %>%
 ```
 
 ```{r}
-(svp <- info_models$smote_simple_svm_p_kernlab)
+(svp <- info_models$smote_outlier_svm_p_kernlab)
 ```
 
 El primer elemento es un objeto "ksvm" de clase S4 el cual indica lo siguiente:
@@ -958,10 +969,10 @@ El primer elemento es un objeto "ksvm" de clase S4 el cual indica lo siguiente:
 - Tenemos `r svp@nSV` vectores de soporte, 
 
 ```{r}
-(knd <- info_models$submuestreo_knn)
+(knd <- info_models$smote_simple_knn)
 ```
 
-- El mejor $k = 9$, el cual es impar.
+- El mejor fue k = `r knd$best.parameters$k`, el cual es impar.
 - La mejor función de distancia ponderada es `r knd$best.parameters$kernel`
 
 ## Evaluación
@@ -1008,11 +1019,16 @@ datos de validación.
 de prueba
 
 ```{r}
-test_result_list %>% 
+metricas_test <- test_result_list %>% 
 	map_dfr(~ collect_metrics(.x), .id = "modelo") %>% 
 	pivot_wider(names_from = .metric, values_from = .estimate) %>%
 	select(-c(.estimator:.config)) %>% 
-	relocate(specificity, roc_auc, kap, .after = modelo) %>% 
+	rename(kappa = kap) %>% 
+	relocate(specificity, roc_auc, kappa, .after = modelo)
+```
+
+```{r}
+metricas_test %>% 
 	tabla("Desempeño de los modelos con los datos de validación")
 ```
 
@@ -1021,9 +1037,9 @@ funcione con nuevos datos.
 
 Primero calculemos el AUC utilizando la función `roc_auc()` en la que definimos
 que el evento verdad (*truth*) es la columna *type* y la estimación de
-probabilidad numérica es `r coloring_font("**.pred_spam**", "blue")`
+probabilidad numérica es  `r coloring_font("**.pred_spam**", "blue")`
 
-```{r}
+```{r, paged.print = FALSE}
 (auc_test <- test_result_list %>% 
 	map_dfr(~ collect_predictions(.x), .id = "modelo") %>% 
 	group_by(modelo) %>% 
@@ -1038,7 +1054,7 @@ probabilidad numérica es `r coloring_font("**.pred_spam**", "blue")`
 (ref:roc-test) ¿Cómo se ven las curvas de ROC para estos modelos en los datos de prueba?
 
 ```{r, roc-test, fig.cap='(ref:roc-test)', fig.width=13, fig.asp=0.7}
-test_result_list %>% 
+roc_test <- test_result_list %>% 
 	map_dfr(~ collect_predictions(.x), .id = "modelo") %>% 
 	group_by(modelo) %>% 
    roc_curve(type, .pred_spam, event_level = "second") %>%  
@@ -1059,15 +1075,49 @@ test_result_list %>%
 					label = auc_test$nombre[[2]],
 					size  = 10) +
 		drako + theme(legend.position = c(0.7, 0.1)) +
-		labs(title = "AUC sobre datos de prueba")
+		labs(title = "Datos de prueba")
 	
 ```
 
-En el gráfico \@ref(fig:roc-test) vemos que el AUC del modelo KNN es más alto.
+(ref:idf) ¿Cuál de los dos modelos podemos considerar que es mejor en función del AUC?
 
-<!-- En la figura \@ref(fig:valoresx) en el cuadrante de especificidad vemos el -->
-<!-- valor óptimo de la función de costo el cual con esta mayor penalización se -->
-<!-- reduce la probabilidad de clasificación errónea. También vemos que la función -->
-<!-- sigma (o gamma whatever) -->
+```{r, idf, fig.cap='(ref:idf)', fig.width=13, fig.asp=0.7}
+list(roc_train, roc_test) %>% 
+	reduce(.f = `+`) +
+	plot_layout(ncol = 2) +
+   plot_annotation(title = "Diferencias entre AUC para conjuntos de entrenamiento y prueba")
+```
+
+En el gráfico \@ref(fig:roc-test) vemos que el AUC del modelo KNN en el conjunto
+de prueba es más alto. Vemos que las métricas del conjunto de prueba son
+superiores a las del conjunto de entrenamiento.
+
+```{r}
+comparacion <- metricas_train %>% 
+	mutate(datos = "entrenamiento", .after = modelo) %>% 
+	select(-rank) %>% 
+	bind_rows(metricas_test %>% 
+	mutate(datos = "prueba", .after = modelo))
+
+comparacion[, 3:7] <- map(comparacion %>%
+	 	select(is.numeric), ~ color_bar("lightgreen")(.x))
+```
+
+
+```{r, comp}
+comparacion %>% 
+	kbl(escape = F) %>% 
+	kable_paper("hover", full_width = T) %>% 
+   column_spec(3:7, width = "5cm")
+```
+
+En la tabla \@ref(tab:comp) vemos 
+
+# Modelo Definitivo
+
+Una vez que tenemos el modelo correcto, con los parámetros seleccionados, volveremos
+que volver a entrenarlo con toda la base disponible (train + test) obteniendo el
+modelo definitivo que puedes poner en producción
+
 
 # Referencias
