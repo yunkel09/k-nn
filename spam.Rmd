@@ -798,7 +798,7 @@ clasificados correctamente como "no spam".  Esto es relevante dada la
 preocupación de que un correo legítimo sea considerado como "spam".
 
 Seleccionemos los dos mejores modelos de cada tipo.  En este caso vamos a
-omitir el primer modelo debido a que el coeficiente de Cohen Kappa es muy bajo,
+omitir el primer modelo debido a que el coeficiente de Kappa es muy bajo,
 al igual que la sensibilidad.
 
 ```{r}
@@ -811,7 +811,15 @@ al igual que la sensibilidad.
 <!-- pred_nonspam .pred_spam -->
 
 ```{r}
-roc_kear <- function(top_models, wflow, evto_pred, verdad) {
+# el primer nivel es nonspam y el segundo nivel es spam
+contrasts(spam$type)
+```
+
+Crearemos una función para flexibilizar el gráfico de AUC, aunque no sea
+posible generalizar para los datos de prueba.
+
+```{r}
+roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
 	
 	
 	# tomar en cuenta que `collect_predictions()` puede sumarizar los diversos
@@ -822,10 +830,10 @@ roc_kear <- function(top_models, wflow, evto_pred, verdad) {
 						collect_predictions(), .id = "modelo")
 		
 		
-	# calcular el area bajo la curva para cada modelo	
+	# calcular el área bajo la curva para cada modelo	
 	auc <- .datos %>%
 		group_by(modelo) %>%
-		roc_auc(type, .pred_spam, event_level = "second") %>%
+		roc_auc({{ verdad }}, {{ evto_pred }}, event_level = nivel) %>%
 		select(modelo, auc = .estimate) %>%
 		mutate(mo = c("svm", "knn"),
 		       por = percent_format(accuracy = 0.0100000000)(auc),
@@ -835,7 +843,7 @@ roc_kear <- function(top_models, wflow, evto_pred, verdad) {
 	# graficar ROC	
 	.datos %>%
 		group_by(modelo) %>%
-		roc_curve(type, {{ verdad }}, event_level = evto_pred) %>%
+		roc_curve({{ verdad }}, {{ evto_pred }}, event_level = nivel) %>%
 		ggplot(aes(x = 1 - specificity, y = sensitivity, color = modelo)) +
 		geom_line(size = 1, alpha = 0.5) +
 		geom_abline(lty   = 2,
@@ -847,9 +855,9 @@ roc_kear <- function(top_models, wflow, evto_pred, verdad) {
 					y = 0.7,
 					label = auc$nombre[[1]],
 					size  = 10) +
-			annotate("text",
+		annotate("text",
 					x = 0.35,
-					y = 0.65,
+					y = 0.63,
 					label = auc$nombre[[2]],
 					size  = 10) +
 		drako + theme(legend.position = c(0.7, 0.1)) +
@@ -858,101 +866,25 @@ roc_kear <- function(top_models, wflow, evto_pred, verdad) {
 }
 ```
 
-```{r}
-# 
-roc_kear(
-	top_models = best,
-	wflow      = tune_res,
-	evto_pred  = "second",
-	verdad     = .pred_spam
-)
-```
-
-```{r}
-roc_kear(
-	top_models = best,
-	wflow      = tune_res,
-	evto_pred  = "first",
-	verdad     = .pred_nonspam
-)
-```
-
-
-```{r, roc, fig.cap='(ref:roc)', fig.width=13, fig.asp=0.7}
-
-	# tomar en cuenta que `collect_predictions()` puede sumarizar los diversos
-	# resultados sobre las predicciones replicadas fuera de la muestra.
-	.datos <- best %>% 
-		imap_dfr(~ tune_res %>% 
-						extract_workflow_set_result(id = .x) %>% 
-						collect_predictions(), .id = "modelo")
-
-
-	# los resultados se promedian sobre predicciones repetidas	
-	auc <- .datos %>% 
-		group_by(modelo) %>% 
-		roc_auc(type, .pred_spam, event_level = "second") %>% 
-		select(modelo, auc = .estimate) %>%
-		mutate(mo = c("svm", "knn"),
-		       por = percent_format(accuracy = 0.0100000000)(auc)) %>% 
-		unite("nombre", c(mo, por), sep = ": ")
-	
-
-	.datos %>% 
-		group_by(modelo) %>% 
-		roc_curve(type, .pred_spam, event_level = "second") %>% 
-		ggplot(aes(x = 1 - specificity, y = sensitivity, color = modelo)) +
-		geom_line(size = 1, alpha = 0.5) +
-		geom_abline(lty = 2,
-						alpha = 0.5,
-						color = "gray50",
-						size = 1.2) +
-		annotate("text", 
-					x = 0.35, y = 0.7, 
-					label = auc$nombre[[1]],
-					size = 10) +
-			annotate("text", 
-					x = 0.35, y = 0.65, 
-					label = auc$nombre[[2]],
-					size = 10) +
-		drako + theme(legend.position = c(0.7, 0.1)) +
-		labs(title = "AUC")
-```
-
-
-geom_text(aes(label = str_c(n, " ", "(", percent, ")")),
-					 hjust = 1.5,
-					 size = 6,
-					 color = "white") +
-
 (ref:roc) ¿Cómo se ven las curvas de ROC para estos modelos?
 
 ```{r, roc, fig.cap='(ref:roc)', fig.width=13, fig.asp=0.7}
-best %>% 
-	imap_dfr(~ tune_res %>% 
-					extract_workflow_set_result(id = .x) %>% 
-					collect_predictions() %>% 
-					select(contains("spam"), type), .id = "modelo") %>% 
-	group_by(modelo) %>% 
-	roc_curve(type, .pred_spam, event_level = "second") %>% class()
-	autoplot() +
-	# ggplot(aes(x = 1 - specificity, y = sensitivity, color = modelo)) +
-	# geom_line(size = 1, alpha = 0.5) +
-	# geom_abline(lty = 2,
-	# 				alpha = 0.5,
-	# 				color = "gray50",
-	# 				size = 1.2) +
-	drako
+roc_kear(
+	top_models = best,
+	wflow      = tune_res,
+	verdad     = type,
+	evto_pred  = .pred_spam,
+	nivel      = "second")
 ```
 
+En la figura \@ref(fig:roc) estamos evaluando la tasa de verdaderos positivos
+del evento spam.  Los valores no son tal altos debido a que seleccionamos los
+modelos con base a la mayor especificidad, es decir aquellos con mayor capacidad
+de seleccionar correctamente aquellos correos que no sean spam.  Para efectos
+prácticos analicemos el AUC en materia de capacidad de los modelos de predecir
+correctamente los correos spam.
 
-Con base a la tabla \@ref(tab:modelos) y a la figura \@ref(fig:roc)
-seleccionemos los dos mejores modelos de cada motor para probarlos contra el
-dataset de prueba.
-
-
-
-
+Guardemos nuestros mejores modelos de cada motor en una lista
 
 ```{r}
 (lista_mejores <- best %>% 
@@ -1022,7 +954,7 @@ El primer elemento es un objeto "ksvm" de clase S4 el cual indica lo siguiente:
 
 - La función nos indica que hemos realizado un modelo de clasificación.
 - Es un kernel polinómico con grado `r svp@kernelf@kpar$degree`
-- Con una función de costo = `r svp@param$C`
+- Con una función de costo C = `r svp@param$C`
 - Tenemos `r svp@nSV` vectores de soporte, 
 
 ```{r}
@@ -1039,7 +971,7 @@ Posterior a esto haremos lo siguiente:
 1. Extraer el/los modelos seleccionados del workflow llamado
 `r coloring_font("**tune_res**", "#A24000")` 
 utilizando la función `extract_workflow()`. Recordemos que un workflow es un
-combinación de receta de preprocesaimiento en conjunto con un motor (modelo) a
+combinación de receta de preprocesamiento en conjunto con un motor (modelo) a
 utilizar. Los workflows seleccionado serán aquellos que con base a métricas
 revisadas en el paso anterior se consideran óptimos.
 
@@ -1069,8 +1001,8 @@ seleccionados al conjunto de validación.
 test_result_list
 ```
 
-En esta lista vemos los resultados de los modelos seleccionados con los datos
-de validación.
+En esta lista vemos los resultados de los modelos seleccionados ajustados a los
+datos de validación.
 
 4. Haciendo uso de `collect_metrics()` podemos ver las métricas para el conjunto
 de prueba
@@ -1087,8 +1019,51 @@ test_result_list %>%
 5. Con `collect_predictions()` podemos ver cómo podemos esperar que este modelo
 funcione con nuevos datos.
 
+Primero calculemos el AUC utilizando la función `roc_auc()` en la que definimos
+que el evento verdad (*truth*) es la columna *type* y la estimación de
+probabilidad numérica es `r coloring_font("**.pred_spam**", "blue")`
 
+```{r}
+(auc_test <- test_result_list %>% 
+	map_dfr(~ collect_predictions(.x), .id = "modelo") %>% 
+	group_by(modelo) %>% 
+	roc_auc(type, .pred_spam, event_level = "second") %>% 
+	select(modelo, auc = .estimate) %>%
+	mutate(mo = c("svm", "knn"),
+		    por = percent_format(accuracy = 0.0100000000)(auc),
+			.keep = "used") %>%
+	unite("nombre", c(mo, por), sep = ": "))
+```
 
+(ref:roc-test) ¿Cómo se ven las curvas de ROC para estos modelos en los datos de prueba?
+
+```{r, roc-test, fig.cap='(ref:roc-test)', fig.width=13, fig.asp=0.7}
+test_result_list %>% 
+	map_dfr(~ collect_predictions(.x), .id = "modelo") %>% 
+	group_by(modelo) %>% 
+   roc_curve(type, .pred_spam, event_level = "second") %>%  
+	ggplot(aes(x = 1 - specificity, y = sensitivity, color = modelo)) +
+		geom_line(size = 1, alpha = 0.5) +
+		geom_abline(lty   = 2,
+						alpha = 0.5,
+						color = "gray50",
+						size  = 1.2) +
+		annotate("text",
+					x = 0.35,
+					y = 0.75,
+					label = auc_test$nombre[[1]],
+					size  = 10) +
+		annotate("text",
+					x = 0.35,
+					y = 0.63,
+					label = auc_test$nombre[[2]],
+					size  = 10) +
+		drako + theme(legend.position = c(0.7, 0.1)) +
+		labs(title = "AUC sobre datos de prueba")
+	
+```
+
+En el gráfico \@ref(fig:roc-test) vemos que el AUC del modelo KNN es más alto.
 
 <!-- En la figura \@ref(fig:valoresx) en el cuadrante de especificidad vemos el -->
 <!-- valor óptimo de la función de costo el cual con esta mayor penalización se -->
