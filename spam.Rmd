@@ -98,6 +98,7 @@ import::from(tidytext, reorder_within, scale_y_reordered, scale_x_reordered)
 import::from(doParallel, registerDoParallel)
 import::from(cowplot, .except = "stamp")
 import::from(kableExtra, .except = "group_rows")
+import::from(magrittr, "%T>%", "%$%", .into = "operadores")
 import::from(DataExplorer, plot_intro, plot_bar, plot_density)
 import::from(conectigo, cargar_fuentes)
 import::from(colorblindr, scale_color_OkabeIto)
@@ -149,86 +150,21 @@ barra <- function(df, x) {
 					 size = 6,
 					 color = "white") +
 					 # fontface = "bold") +
-		scale_x_continuous(expand = c(0, 0)) +
+		scale_x_continuous(name = NULL, expand = c(0, 0)) +
 		scale_y_discrete(name = NULL, expand = c(0, 0.5)) +
-		coord_cartesian(clip = "off") +
+		# coord_cartesian(clip = "off") +
 		theme_minimal_vgrid(font_family = "yano") +
 		theme(axis.text.y = element_text(size = 14),
 				plot.title = element_text(size = 22, face = "bold"))
 }
 ```
 
-## Metricas
-
-La fórmula del RMSLE es:
-
-$$\sqrt{\frac{1}{n}\sum_{i = 1}^{n} (log(x_{i} + 1) - log(y_{i} + 1))^2}$$
-
-Donde X es el valor predecido y Y es el valor actual
-
-En el caso de RMSE, la presencia de valores atípicos puede hacer explotar el
-término de error a un valor muy alto. Pero, en el caso de RMLSE, los valores
-atípicos se reducen drásticamente, lo que anula su efecto.
-
-Lo que sucede es que el RMSE se va a incrementar con la presencia de atípicos,
-en cambio el **RMSLE no se afecta mucho**. El RMSLE es un error relativo.
-
-Otro aspecto a considerar es que el RMSE aumenta si las medidas entre las
-predicción y el valor actual son grandes. En cambio RMSLE es un valor relativo.
-
-El factor más importante para utilizar el RMSLE es que RMSLE incurre en una
-penalización mayor por la subestimación de la variable real que la
-sobreestimación. En palabras simples, se incurre en más penalización cuando el
-valor predicho es menor que el valor real. Por otro lado, se incurre en menos
-penalización cuando el valor predicho es mayor que el valor real.
-
-Esto es especialmente útil para casos en los que la subestimación de la
-variable objetivo no es aceptable, pero se puede tolerar la sobreestimación.
-
-Supongamos que sobrestimamos la renta de bicicletas, el adminstrador puede
-tener más bicicletas disponibles para atender la demanda suponiendo que el
-costo de mantener más bicicletas es menor que el costo de no rentarlas. El
-problema se daría si la cantidad de bicicletas predichas es menor, en este caso
-es probable que el administrador pierda dinero por no tener suficientes
-bicicletas para suplir la demanda.
+## Opciones
 
 ```{r}
-# métrica rmsle
-rmsle_vec <- function(truth, estimate, na_rm = TRUE, ...) {
-  
-	rmsle_impl <- function(truth, estimate) {
-    sqrt(mean((log(truth + 1) - log(estimate + 1))^2))
-  }
-
-  metric_vec_template(
-    metric_impl = rmsle_impl,
-    truth = truth,
-    estimate = estimate,
-    na_rm = na_rm,
-    cls = "numeric",
-    ...
-  )
-}
-
-rmsle <- function(data, ...) {
-  UseMethod("rmsle")
-}
-rmsle <- new_numeric_metric(rmsle, direction = "minimize")
-
-rmsle.data.frame <- function(data, truth, estimate, na_rm = TRUE, ...) {
-  metric_summarizer(
-    metric_nm = "rmsle",
-    metric_fn = rmsle_vec,
-    data = data,
-    truth = !!enquo(truth),
-    estimate = !!enquo(estimate),
-    na_rm = na_rm,
-    ...
-  )
-}
+set.seed(2021)
 ```
 
-## Opciones
 
 ```{r}
 cargar_fuentes()
@@ -273,9 +209,13 @@ spam <- data("spam", package = "kernlab") %>%
 head(spam)
 ```
 
+<br/>
+
 ```{r}
 plot_intro(spam, ggtheme = yunkel)
 ```
+
+<br/>
 
 Ninguna de nuestras variables tiene datos ausentes. Solo hay una variable
 categórica.
@@ -300,6 +240,8 @@ spam %>%
 	barra(type) +
 	labs(title = "Clasificación desequilibrada")
 ```
+
+<br/>
 
 En el gráfico \@ref(fig:desbalance) observamos que la variable no está
 equilibrada. La clase `r coloring_font("**no_spam**", "#A24000")` tiene más
@@ -337,12 +279,11 @@ sl <- spam %>%
 slice_sample(sl, n = 5)
 ```
 
-<p class="comment">
 Para graficar no será suficiente la transformación logarítmica, así que
 aplicaremos una segunda transformación a nivel del eje Y. Esto nos permitirá
 ver de forma ordenada las variables con información que tienen atípicos
 separada por cada uno de los distintos tipos de correo.
-</p>
+
 
 ```{r, fig.width=11, fig.asp=0.6}
 sl %>% 
@@ -355,15 +296,16 @@ sl %>%
 	scale_y_log10() +
 	facet_grid(type ~ ., scales = "free", space = "free") +
 	drako +
-	theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = -0.1)) +
+	theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = -0.1),
+			axis.title.x = element_blank()) +
 	labs(title        = "Atípicos con variables informativas", 
-		  subtitle     = "Doble escala logarítmica")
+		 subtitle     = "Doble escala logarítmica")
 ```
 
-<p class="comment">
+<br/>
+
 El tratamiento de atípicos puede mejorarse a través de una técnica llamada
 *spatial sign* [@kuhn_applied_2013 pag. 71-72]
-</p>
 
 # Split
 
@@ -384,9 +326,8 @@ será suficiente para obtener **buenas propiedades de bias y varianza.**
 
 [^1]: Definir que es grande y que es pequeño es difícil
 
-```{r}
-set.seed(2021)
-spam_folds <- vfold_cv(spam_train, strata = type)
+```{r, paged.print = FALSE}
+(spam_folds <- vfold_cv(spam_train, v = 10, strata = type))
 ```
 
 # Preprocesamiento
@@ -492,6 +433,8 @@ receta_smote %>%
 	barra(type) + labs("Clasificación Balanceada")
 ```
 
+<br/>
+
 ## SMOTE + Atípicos
 
 Utilizaremos una receta con un paso adicional denominado *spatial sign* el
@@ -561,7 +504,7 @@ de que encuentre la *K* óptima.
 
 ```{r}
 knn_kknn <- nearest_neighbor(neighbors   = tune(),
-						   weight_func = tune()) %>%
+						     weight_func = tune()) %>%
 	set_mode("classification") %>%
 	set_engine("kknn")
 ```
@@ -590,7 +533,7 @@ svm_p_kernlab <- svm_poly(cost   = tune(),
 
 ```{r}
 svm_r_kernlab <- svm_rbf(cost = tune(), 
-					   rbf_sigma = tune()) %>% 
+					     rbf_sigma = tune()) %>% 
   set_engine("kernlab") %>% 
   set_mode("classification")
 ```
@@ -624,6 +567,8 @@ preprocesadores %>%
 	arrange(desc(value)) %>% 
 	tabla(cap = "Cantidad de observaciones restantes")
 ```
+
+<br/>
 
 Con base a la tabla \@ref(tab:observaciones) vemos que el algoritmo de
 **submuestreo resulta en menos observaciones** que los restantes tres,
@@ -762,11 +707,14 @@ pin_write(board = tablero,
 			 description = "19575 modelos entrenados")
 ```
 
-Veamos cuantos modelos fueron ajustados:
+La columna `r coloring_font("**result**", "#A24000")` contiene  `tune[+]` lo
+cual indica que todos los hiperparámetros fueron identificados correctamente.
 
 ```{r}
-nrow(collect_metrics(tune_res, summarize = FALSE))
+(tm <- nrow(collect_metrics(tune_res, summarize = FALSE)))
 ```
+
+Se ajustaron un total de **`r tm`** modelos!
 
 Ahora veamos los resultados de las métricas con nuestro conjunto de
 entrenamiento.
@@ -780,12 +728,26 @@ tune_rank <- tune_res %>%
 	relocate(specificity, .after = "rank")
 ```
 
+```{r}
+ranking_models <- tune_rank
+ranking_models[, 3:7] <- map(tune_rank %>%
+	 	select(is.double), ~ color_tile("#FC8D59", "lightgreen")(.x))
+```
+
+
+
 ```{r, modelos, paged.print = FALSE}
-tune_rank %>% 
+ranking_models %>% 
 	tabla(cap = "Ranking de los mejores ajustes con datos de entrenamiento")
 ```
 
-Veamos esto mismo de froma gráfica.
+<br/>
+
+En la tabla \@ref(tab:modelos) vemos que el color más verde corresponde a la
+métrica de esa columna que obtuvo la mayor puntuación y el color rojo el que 
+obtuvo la menor.
+
+Veamos esto mismo de forma gráfica.
 
 (ref:all-models) Todas las combinaciones de modelos ajustados
 
@@ -793,12 +755,14 @@ Veamos esto mismo de froma gráfica.
 autoplot(tune_res, select_best = TRUE) + drako
 ```
 
-En la tabla \@ref(tab:modelos) y en la figura \@ref(fig:all-models) vemos 
-`r nrow(tune_rank)` combinaciones de los mejores modelos con diferentes motores y
-algoritmos de balanceo. La especificidad es la proporción de ceros (nonspam)
-estimados como ceros, es decir, que proporción de correos de tipo "no spam"
-fueron clasificados correctamente como "no spam".  Esto es relevante dada la
-preocupación de que un correo legítimo sea considerado como "spam".
+<br/>
+
+En la figura \@ref(fig:all-models) vemos `r nrow(tune_rank)` combinaciones de
+los mejores modelos con diferentes motores y algoritmos de balanceo. La
+especificidad es la proporción de ceros (nonspam) estimados como ceros, es
+decir, que proporción de correos de tipo "no spam" fueron clasificados
+correctamente como "no spam".  Esto es relevante dada la preocupación de que un
+correo legítimo sea considerado como "spam".
 
 Seleccionemos los dos mejores modelos de cada tipo.  En este caso vamos a
 omitir el primer modelo debido a que el coeficiente de Kappa es muy bajo,
@@ -818,17 +782,19 @@ metricas_train <- tune_rank %>%
 
 <!-- pred_nonspam .pred_spam -->
 
+Es importante revisar el orden de los niveles en la variable respuesta, ya que
+al momento de calcular el AUC debemos especificar que evento es el que queremos
+indicar.
+
 ```{r}
-# el primer nivel es nonspam y el segundo nivel es spam
 contrasts(spam$type)
 ```
 
 Crearemos una función para flexibilizar el gráfico de AUC, aunque no sea
-posible (por el momento) generalizar para los datos de prueba.
+posible (por el momento) generalizarla para los datos de prueba.
 
 ```{r}
 roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
-	
 	
 	# tomar en cuenta que `collect_predictions()` puede sumarizar los diversos
 	# resultados sobre las predicciones replicadas fuera de la muestra, es decir,
@@ -860,7 +826,7 @@ roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
 						size  = 1.2) +
 		annotate("text",
 					x = 0.35,
-					y = 0.7,
+					y = 0.75,
 					label = auc$nombre[[1]],
 					size  = 10) +
 		annotate("text",
@@ -874,9 +840,11 @@ roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
 }
 ```
 
+Aplicamos la función
+
 (ref:roc) ¿Cómo se ven las curvas de ROC para estos modelos?
 
-```{r, roc, fig.cap='(ref:roc)', fig.width=13, fig.asp=0.7}
+```{r, roc, fig.cap='(ref:roc)', fig.width=11, fig.asp=0.7}
 roc_train <- roc_kear(
 	top_models = best,
 	wflow      = tune_res,
@@ -887,6 +855,7 @@ roc_train <- roc_kear(
 roc_train
 ```
 
+<br/>
 
 En la figura \@ref(fig:roc) estamos evaluando la tasa de verdaderos positivos
 del evento spam.  Los valores no son tal altos debido a que seleccionamos los
@@ -902,6 +871,9 @@ Guardemos nuestros mejores modelos de cada motor en una lista
 	map(~ tune_res %>% extract_workflow_set_result(id = .x) %>% 
 					       select_best(metric = "specificity")))
 ```
+
+Al tenerlos en una lista nos permitirá realizar iteraciones sobre los mismos
+para posteriormente validar resultados con el set de pruebas.
 
 ## Hiperparámetros
 
@@ -922,6 +894,8 @@ grf <- best %>% imap(~ autoplot(tune_res, select_best = TRUE, id = .x) +
 grf[[1]]
 ```
 
+<br/>
+
 Vemos en la gráfica \@ref(fig:svm-cost) como evolucionan los hiperparámetros
 del modelo seleccionado en cada una de las métricas previamente establecidas. 
 En este caso como tenemos un *kernel polinomial* podemos ver además de la
@@ -934,6 +908,8 @@ decisión será más flexible.
 ```{r, knn-cost, fig.cap='(ref:knn-cost)', echo=FALSE, fig.width=13, fig.asp=0.6}
 grf[[2]]
 ```
+
+<br/>
 
 En la figura \@ref(fig:knn-cost) vemos los diferentes valores de los hiperparámetros
 para el modelo k-nn con ajuste de desbalance por submuestreo. Se observan las
@@ -965,7 +941,7 @@ El primer elemento es un objeto "ksvm" de clase S4 el cual indica lo siguiente:
 
 - La función nos indica que hemos realizado un modelo de clasificación.
 - Es un kernel polinómico con grado `r svp@kernelf@kpar$degree`
-- Con una función de costo C = `r svp@param$C`
+- Con una función de costo $C$ = `r svp@param$C`
 - Tenemos `r svp@nSV` vectores de soporte, 
 
 ```{r}
@@ -1032,6 +1008,8 @@ metricas_test %>%
 	tabla("Desempeño de los modelos con los datos de validación")
 ```
 
+<br/>
+
 5. Con `collect_predictions()` podemos ver cómo podemos esperar que este modelo
 funcione con nuevos datos.
 
@@ -1057,7 +1035,7 @@ probabilidad numérica es  `r coloring_font("**.pred_spam**", "blue")`
 roc_test <- test_result_list %>% 
 	map_dfr(~ collect_predictions(.x), .id = "modelo") %>% 
 	group_by(modelo) %>% 
-   roc_curve(type, .pred_spam, event_level = "second") %>%  
+    roc_curve(type, .pred_spam, event_level = "second") %>%  
 	ggplot(aes(x = 1 - specificity, y = sensitivity, color = modelo)) +
 		geom_line(size = 1, alpha = 0.5) +
 		geom_abline(lty   = 2,
@@ -1085,33 +1063,97 @@ roc_test <- test_result_list %>%
 list(roc_train, roc_test) %>% 
 	reduce(.f = `+`) +
 	plot_layout(ncol = 2) +
-   plot_annotation(title = "Diferencias entre AUC para conjuntos de entrenamiento y prueba")
+    plot_annotation(title = "Diferencias entre AUC para conjuntos de entrenamiento y prueba")
 ```
 
-En el gráfico \@ref(fig:roc-test) vemos que el AUC del modelo KNN en el conjunto
-de prueba es más alto. Vemos que las métricas del conjunto de prueba son
-superiores a las del conjunto de entrenamiento.
+En el gráfico \@ref(fig:idf) vemos que el AUC del modelo KNN en el conjunto de
+prueba es más alto. Vemos que las métricas del conjunto de prueba son
+**ligeramente** superiores a las del conjunto de entrenamiento.
+
+### Matriz de Confusión
 
 ```{r}
-comparacion <- metricas_train %>% 
-	mutate(datos = "entrenamiento", .after = modelo) %>% 
-	select(-rank) %>% 
-	bind_rows(metricas_test %>% 
-	mutate(datos = "prueba", .after = modelo))
+test_result_list %>% 
+	map_dfr(~ collect_predictions(.x), .id = "modelo") %>% 
+	group_by(modelo) %>% 
+	conf_mat(type, .pred_class) %>% 
+	rename(mc = conf_mat) %>% 
+	mutate(mc = set_names(mc, c("svm", "knn")))
 
-comparacion[, 3:7] <- map(comparacion %>%
-	 	select(is.numeric), ~ color_bar("lightgreen")(.x))
+
+	mutate(graficos = map(conf_mat, ~ autoplot(.x) + )) 
+	# mutate(graficos = map(conf_mat, ~ autoplot(.x))) 
+
+%$%
+			 graficos %>% 
+				set_names(names(test_result_list)) %>% 
+				iwalk(~ print(.x))
+			 graficos %>% walk(~ print(.x)) %>% 
 ```
 
+### Métricas
+
+```{r}
+comparacion <- metricas_train %>%
+	mutate(datos = "entrenamiento", .after = modelo) %>%
+	select(-rank) %>%
+	bind_rows(metricas_test %>%
+	mutate(datos = "prueba", .after = modelo))
+```
+
+```{r}
+comparacion[, 3:7] <- map(comparacion %>%
+	 	select(is.numeric), ~ color_tile("#FC8D59", "lightgreen")(.x))
+```
 
 ```{r, comp}
-comparacion %>% 
-	kbl(escape = F) %>% 
-	kable_paper("hover", full_width = T) %>% 
-   column_spec(3:7, width = "5cm")
+comparacion %>%
+	tabla(cap = "Comparacion de métricas")
 ```
 
-En la tabla \@ref(tab:comp) vemos 
+<br/>
+
+En la tabla \@ref(tab:comp) vemos en verde el que obtuvo mayor valor con
+respecto a la métrica de esa columna.  En cuatro de las cinco métricas el
+modelo `r coloring_font("**smote_simple_knn**", "#AFC8D59")` del conjunto de
+validación (prueba) obtuvo mejores resultados.
+
+Veamos una forma diferente de analizar estas métricas:
+
+```{r, comp2}
+metricas_train %>% 
+	select(-rank) %>% 
+	pivot_longer(cols = specificity:sensitivity,
+					 names_to = "metrica",
+					 values_to = "train") %>% 
+	bind_cols(metricas_test %>% 
+				 	pivot_longer(cols = specificity:sensitivity,
+					 names_to = "metrica",
+					 values_to = "test") %>% 
+				 	select(test)) %>% 
+	mutate(delta = test - train, 
+			 diff_porcentual = percent_format(accuracy = 0.01)(delta)) %>% 
+	tabla(cap = "Métricas de Train contra test")
+```
+
+<br/>
+
+En la tabla \@ref(tab:comp2) podemos ver lo siguiente:
+
+* Los valores positivos de la columna `r coloring_font("**delta**", "#A24000")`
+indican que la métrica de **test fue superior a la de train.**.
+
+* La columna `r coloring_font("**diff_porcentual**", "#A24000")` representa que
+tanto porcentualmente son diferentes las métricas de train con respecto a test.
+
+* Para `r coloring_font("**smote_simple_knn**", "#A24000")` tenemos que
+$\frac{3}{5}$ de las métricas de test fueron superiores a las de train.
+
+* Para `r coloring_font("**smote_outlier_svm_p_kernlab**", "#A24000")` tenemos
+que $\frac{2}{5}$ de las métricas de test fueron superiores a las de train.
+
+
+
 
 # Modelo Definitivo
 
