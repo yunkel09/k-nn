@@ -88,9 +88,8 @@ options(warn = -1,
 
 ```{r}
 import::from(statistigo, coloring_font)
-import::from(finetune, control_race)
-import::from(statistigo, coloring_font)
 import::from(skimr, skim)
+import::from(formattable, color_tile)
 import::from(patchwork, plot_layout, plot_annotation)
 import::from(caret, nearZeroVar)
 import::from(parallel, detectCores, makePSOCKcluster, stopCluster)
@@ -102,7 +101,7 @@ import::from(magrittr, "%T>%", "%$%", .into = "operadores")
 import::from(DataExplorer, plot_intro, plot_bar, plot_density)
 import::from(conectigo, cargar_fuentes)
 import::from(colorblindr, scale_color_OkabeIto)
-pacman::p_load(formattable, janitor, pins, themis, usemodels, tidymodels, tidyverse)
+pacman::p_load(janitor, pins, themis, tidymodels, tidyverse)
 ```
 
 ## Funciones
@@ -661,11 +660,11 @@ set.seed(2021)
 
 ```{r, echo=FALSE}
 # corrida manual
-# ruta <- fs::path_wd("06_svm_knn", "knn", "modelos")
-# tablero <- board_folder(path = ruta)
+ruta <- fs::path_wd("06_svm_knn", "knn", "modelos")
+tablero <- board_folder(path = ruta)
 
 # corrida en knit 
-tablero <- board_folder(path = "./modelos")
+# tablero <- board_folder(path = "./modelos")
 ```
 
 ```{r, echo=FALSE}
@@ -1072,42 +1071,48 @@ prueba es más alto. Vemos que las métricas del conjunto de prueba son
 
 ### Matriz de Confusión
 
+Crearemos dos tipos de gráficos: 
+
+- `r coloring_font("**mosaico**", "#A24000")`
+- `r coloring_font("**heatmap**", "#A24000")`
+
+Esto nos permitirá realizar una comparación en términos de matriz de confusión
+cuales son las diferencias entre cada uno de los modelos.
+
 ```{r}
-test_result_list %>% 
+mx <- test_result_list %>% 
 	map_dfr(~ collect_predictions(.x), .id = "modelo") %>% 
 	group_by(modelo) %>% 
 	conf_mat(type, .pred_class) %>% 
 	rename(mc = conf_mat) %>% 
 	mutate(mc = set_names(mc, c("svm", "knn")))
-
-
-	mutate(graficos = map(conf_mat, ~ autoplot(.x) + )) 
-	# mutate(graficos = map(conf_mat, ~ autoplot(.x))) 
-
-%$%
-			 graficos %>% 
-				set_names(names(test_result_list)) %>% 
-				iwalk(~ print(.x))
-			 graficos %>% walk(~ print(.x)) %>% 
 ```
+ 
+(ref:matrix) Comparación entre las matrices de confusión para ambos modelos
+ 
+```{r, matrix, fig.cap='(ref:matrix)', fig.width=13, fig.asp=0.7}
+list(mx$mc, type = c("mosaic", "heatmap")) %>% 
+	purrr::cross() %>% 
+	map(lift(autoplot)) %>% 
+	map2(.y = rep(c("svm", "knn"), 2), ~ .x + ggtitle(label = .y)) %>% 
+	reduce(.f = `+`) +
+	plot_layout(ncol = 2) +
+   plot_annotation(title = "Matriz de Confusión")
+```
+ 
+En los primeros dos cuadrantes de la figura \@ref(fig:matrix) se observa que
+a nivel de mosaico ambos modelos tienen una capacidad predictiva similar. En
+los cuadrantes 3 y 4 lo vemos numéricamente.
 
 ### Métricas
 
 ```{r}
-comparacion <- metricas_train %>%
+metricas_train %>%
 	mutate(datos = "entrenamiento", .after = modelo) %>%
 	select(-rank) %>%
 	bind_rows(metricas_test %>%
-	mutate(datos = "prueba", .after = modelo))
-```
-
-```{r}
-comparacion[, 3:7] <- map(comparacion %>%
-	 	select(is.numeric), ~ color_tile("#FC8D59", "lightgreen")(.x))
-```
-
-```{r, comp}
-comparacion %>%
+	mutate(datos = "prueba", .after = modelo)) %>% 
+	mutate(across(is.numeric, ~ color_tile("#FC8D59", "lightgreen")(.x))) %>% 
 	tabla(cap = "Comparacion de métricas")
 ```
 
@@ -1152,14 +1157,42 @@ $\frac{3}{5}$ de las métricas de test fueron superiores a las de train.
 * Para `r coloring_font("**smote_outlier_svm_p_kernlab**", "#A24000")` tenemos
 que $\frac{2}{5}$ de las métricas de test fueron superiores a las de train.
 
+Demos un vistazo rápido a el resto de métricas
 
-
+```{r}
+mx$mc %>% 
+	map_dfr(~ summary(.x), .id = "modelo") %>% 
+	select(-.estimator) %>% 
+	rename(metrica = .metric) %>% 
+	pivot_wider(names_from = modelo, values_from = .estimate) %>% 
+	mutate(across(is.numeric, ~ color_tile("#FC8D59", "lightgreen")(.x))) %>% 
+	tabla("Otras Métricas")
+```
 
 # Modelo Definitivo
 
-Una vez que tenemos el modelo correcto, con los parámetros seleccionados, volveremos
-que volver a entrenarlo con toda la base disponible (train + test) obteniendo el
-modelo definitivo que puedes poner en producción
+`r resaltar("El modelo seleccionado es **knn**")`
+
+Una vez que tenemos el modelo correcto, con los parámetros seleccionados,
+volveremos que volver a entrenarlo con toda la base disponible (train + test)
+obteniendo el modelo definitivo que puedes poner en producción
+
+```{r}
+modelo_definitivo <- tune_res %>% 
+	extract_workflow(id = "smote_simple_knn") %>% 
+	finalize_workflow(tune_res %>%
+			extract_workflow_set_result(id = "smote_simple_knn") %>% 
+			select_best(metric = "specificity")) %>% 
+	fit(spam)
+```
+
+```{r}
+modelo_definitivo
+```
+
+# Conclusiones
+
+- 
 
 
 # Referencias
