@@ -123,6 +123,22 @@ resaltar <- function(texto) {
 ```
 
 ```{r}
+rlt <- function(texto, color) {
+    
+	a <- "<span style='background-color: "
+	b <- "'>"
+	c <- "</span>"
+	t <- str_c("**", texto, "**")
+	
+	f <- str_c(a, color, b)
+   
+	glue::glue(f, t, c) 
+	
+    
+}
+```
+
+```{r}
 # detener el backend
 unregister <- function() {
   env <- foreach:::.foreachGlobals
@@ -279,12 +295,13 @@ slice_sample(sl, n = 5)
 ```
 
 Para graficar no será suficiente la transformación logarítmica, así que
-aplicaremos una segunda transformación a nivel del eje Y. Esto nos permitirá
+aplicaremos una segunda transformación a nivel del eje $Y$. Esto nos permitirá
 ver de forma ordenada las variables con información que tienen atípicos
 separada por cada uno de los distintos tipos de correo.
 
+(ref:atip) Análisis de valores atípicos posterior a eliminar columnas con varianza cercana a cero
 
-```{r, fig.width=11, fig.asp=0.6}
+```{r, atip, fig.cap='(ref:atip)', fig.width=11, fig.asp=0.6}
 sl %>% 
 	pivot_longer(cols = where(is.numeric),
 					 names_to = "variable",
@@ -295,7 +312,7 @@ sl %>%
 	scale_y_log10() +
 	facet_grid(type ~ ., scales = "free", space = "free") +
 	drako +
-	theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = -0.1),
+	theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = -0.01),
 			axis.title.x = element_blank()) +
 	labs(title        = "Atípicos con variables informativas", 
 		 subtitle     = "Doble escala logarítmica")
@@ -303,8 +320,9 @@ sl %>%
 
 <br/>
 
-El tratamiento de atípicos puede mejorarse a través de una técnica llamada
-*spatial sign* [@kuhn_applied_2013 pag. 71-72]
+Observamos en la figura \@ref(fig:atip) que hay atípicos. El tratamiento de
+atípicos puede mejorarse a través de una técnica llamada *spatial sign*
+[@kuhn_applied_2013 pag.71-72]
 
 # Split
 
@@ -434,6 +452,9 @@ receta_smote %>%
 
 <br/>
 
+En la figura \@ref(fig:smot) vemos como el algoritmo SMOTE realizó el balance
+de la variable respuesta.
+
 ## SMOTE + Atípicos
 
 Utilizaremos una receta con un paso adicional denominado *spatial sign* el
@@ -523,7 +544,7 @@ svm_l_kernlab <- svm_linear(cost = tune()) %>%
 ```
 
 ```{r}
-svm_p_kernlab <- svm_poly(cost   = tune(),
+svm_p_kernlab <- svm_poly(cost    = tune(),
 						  degree = tune()) %>% 
   set_engine("kernlab") %>% 
   set_mode("classification")
@@ -531,7 +552,7 @@ svm_p_kernlab <- svm_poly(cost   = tune(),
 
 
 ```{r}
-svm_r_kernlab <- svm_rbf(cost = tune(), 
+svm_r_kernlab <- svm_rbf(cost    = tune(), 
 					     rbf_sigma = tune()) %>% 
   set_engine("kernlab") %>% 
   set_mode("classification")
@@ -559,8 +580,8 @@ ajustar el modelo
 ```{r observaciones, paged.print = FALSE}
 preprocesadores %>%
 	map(~ prep(.) %>%
-		 	juice() %>% 
-		 	nrow()) %>% 
+		 juice() %>% 
+		 nrow()) %>% 
 	enframe() %>% 
 	unnest(value) %>% 
 	arrange(desc(value)) %>% 
@@ -576,7 +597,7 @@ pudiendo significar esto que hay perdida de información.
 ### Modelos
 
 ```{r}
-modelos <- list(knn = knn_kknn,
+modelos <- list(knn        = knn_kknn,
 			svm_p_kernlab   = svm_p_kernlab,
 			svm_l_kernlab   = svm_l_kernlab,
 			svm_r_kernlab   = svm_r_kernlab)
@@ -595,8 +616,8 @@ prácticos no realizaremos este paso en SVM.
 
 ```{r}
 spam_workflow <- workflow_set(preproc = preprocesadores, 
-							  models = modelos, 
-							  cross = TRUE)
+							  models  = modelos, 
+							  cross   = TRUE)
 ```
 
 ```{r, paged.print = FALSE}
@@ -615,7 +636,7 @@ ellas mediante `collect_predictions()` .
 
 ```{r}
 grid_ctrl <- control_grid(
-      save_pred = TRUE,
+      save_pred     = TRUE,
       parallel_over = "everything",
       save_workflow = TRUE)
 ```
@@ -660,11 +681,11 @@ set.seed(2021)
 
 ```{r, echo=FALSE}
 # corrida manual
-ruta <- fs::path_wd("06_svm_knn", "knn", "modelos")
-tablero <- board_folder(path = ruta)
+# ruta <- fs::path_wd("06_svm_knn", "knn", "modelos")
+# tablero <- board_folder(path = ruta)
 
 # corrida en knit 
-# tablero <- board_folder(path = "./modelos")
+tablero <- board_folder(path = "./modelos")
 ```
 
 ```{r, echo=FALSE}
@@ -810,7 +831,7 @@ roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
 		select(modelo, auc = .estimate) %>%
 		mutate(mo = c("svm", "knn"),
 		       por = percent_format(accuracy = 0.0100000000)(auc),
-				 .keep = "used") %>%
+		 .keep = "used") %>%
 		unite("nombre", c(mo, por), sep = ": ")
 		
 	# graficar ROC	
@@ -820,9 +841,9 @@ roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
 		ggplot(aes(x = 1 - specificity, y = sensitivity, color = modelo)) +
 		geom_line(size = 1, alpha = 0.5) +
 		geom_abline(lty   = 2,
-						alpha = 0.5,
-						color = "gray50",
-						size  = 1.2) +
+				alpha = 0.5,
+				color = "gray50",
+				size  = 1.2) +
 		annotate("text",
 					x = 0.35,
 					y = 0.75,
@@ -841,7 +862,7 @@ roc_kear <- function(top_models, wflow, verdad, evto_pred, nivel = "second") {
 
 Aplicamos la función
 
-(ref:roc) ¿Cómo se ven las curvas de ROC para estos modelos?
+(ref:roc) ¿Cómo se ven las curvas de ROC para estos modelos con los datos de entrenamiento?
 
 ```{r, roc, fig.cap='(ref:roc)', fig.width=11, fig.asp=0.7}
 roc_train <- roc_kear(
@@ -857,11 +878,11 @@ roc_train
 <br/>
 
 En la figura \@ref(fig:roc) estamos evaluando la tasa de verdaderos positivos
-del evento spam.  Los valores no son tal altos debido a que seleccionamos los
-modelos con base a la mayor especificidad, es decir aquellos con mayor capacidad
-de seleccionar correctamente aquellos correos que no sean spam.  Para efectos
-prácticos analicemos el AUC en materia de capacidad de los modelos de predecir
-correctamente los correos spam.
+del evento spam.  Es probable que **los valores no sean tan altos debido a que
+seleccionamos los modelos con base a la mayor especificidad, es decir aquellos
+con mayor capacidad de seleccionar correctamente aquellos correos que no sean
+spam.**  Para efectos prácticos analicemos el AUC en materia de capacidad de los
+modelos de predecir correctamente los correos spam.
 
 Guardemos nuestros mejores modelos de cada motor en una lista
 
@@ -887,25 +908,10 @@ grf <- best %>% imap(~ autoplot(tune_res, select_best = TRUE, id = .x) +
 							drako + labs(title = .y))
 ```
 
-(ref:svm-cost) Evolución de los hiperparámetros de SVM polinomial
-
-```{r, svm-cost, fig.cap='(ref:svm-cost)', echo=FALSE, fig.width=13, fig.asp=0.6}
-grf[[1]]
-```
-
-<br/>
-
-Vemos en la gráfica \@ref(fig:svm-cost) como evolucionan los hiperparámetros
-del modelo seleccionado en cada una de las métricas previamente establecidas. 
-En este caso como tenemos un *kernel polinomial* podemos ver además de la
-función de costo $C$ los grados $d$. Entre más grande el grado el límite de
-decisión será más flexible.
-
-
 (ref:knn-cost) Evolución de los hiperparámetros de K-NN
 
 ```{r, knn-cost, fig.cap='(ref:knn-cost)', echo=FALSE, fig.width=13, fig.asp=0.6}
-grf[[2]]
+grf[[1]]
 ```
 
 <br/>
@@ -915,6 +921,20 @@ para el modelo k-nn con ajuste de desbalance por submuestreo. Se observan las
 diferentes combinaciones de $k$ con las distintas funciones de distancia. Vemos
 a simple vista que para una máxima especificidad tenemos una función
 `r coloring_font("**inv**", "#A24000")` y 9 vecinos.
+
+(ref:svm-cost) Evolución de los hiperparámetros de SVM polinomial
+
+```{r, svm-cost, fig.cap='(ref:svm-cost)', echo=FALSE, fig.width=13, fig.asp=0.6}
+grf[[2]]
+```
+
+<br/>
+
+Vemos en la gráfica \@ref(fig:svm-cost) como evolucionan los hiperparámetros
+del modelo seleccionado en cada una de las métricas previamente establecidas. 
+En este caso como tenemos un *kernel polinomial* podemos ver además de la
+función de costo $C$ los grados $d$. Entre más grande el grado el límite de
+decisión será más flexible.
 
 ### Información
 
@@ -954,7 +974,7 @@ El primer elemento es un objeto "ksvm" de clase S4 el cual indica lo siguiente:
 
 Posterior a esto haremos lo siguiente:
 
-1. Extraer el/los modelos seleccionados del workflow llamado
+1. Extraer los modelos seleccionados del workflow llamado
 `r coloring_font("**tune_res**", "#A24000")` 
 utilizando la función `extract_workflow()`. Recordemos que un workflow es un
 combinación de receta de preprocesamiento en conjunto con un motor (modelo) a
@@ -962,13 +982,14 @@ utilizar. Los workflows seleccionado serán aquellos que con base a métricas
 revisadas en el paso anterior se consideran óptimos.
 
 2. Con la función `finalize_workflow()` lo que haremos será decirle al workflow
-seleccionado que usaremos uno los modelos ajustados con datos de entrenamiento
+seleccionado que usaremos los modelos ajustados con datos de entrenamiento
 que contiene los mejores parámetros numéricos encontrados a través del tuning
 usando CV.
 
 3. Con `last_fit()` realizaremos el ajuste final tanto a los datos prueba usando
 los modelos previamente seleccionados. Debemos asegurarnos de definir el set
-de métricas que deseamos comprobar, pudiendo agregar nuevas métricas.
+de métricas que deseamos comprobar, pudiendo agregar nuevas métricas. En este
+caso utilizaremos las previamente definidas.
 
 ```{r}
 test_result_list <- map2(.x = best, .y = lista_mejores, ~ tune_res %>% 
@@ -993,6 +1014,8 @@ datos de validación.
 4. Haciendo uso de `collect_metrics()` podemos ver las métricas para el conjunto
 de prueba
 
+Guardemos esto para una comparación posterior.
+
 ```{r}
 metricas_test <- test_result_list %>% 
 	map_dfr(~ collect_metrics(.x), .id = "modelo") %>% 
@@ -1014,7 +1037,7 @@ funcione con nuevos datos.
 
 Primero calculemos el AUC utilizando la función `roc_auc()` en la que definimos
 que el evento verdad (*truth*) es la columna *type* y la estimación de
-probabilidad numérica es  `r coloring_font("**.pred_spam**", "blue")`
+probabilidad numérica es  `r coloring_font("**.pred_spam**", "#A24000")`
 
 ```{r, paged.print = FALSE}
 (auc_test <- test_result_list %>% 
@@ -1028,6 +1051,8 @@ probabilidad numérica es  `r coloring_font("**.pred_spam**", "blue")`
 	unite("nombre", c(mo, por), sep = ": "))
 ```
 
+Con el AUC calculado para cada modelo, ya podemos graficar.
+
 (ref:roc-test) ¿Cómo se ven las curvas de ROC para estos modelos en los datos de prueba?
 
 ```{r, roc-test, fig.cap='(ref:roc-test)', fig.width=13, fig.asp=0.7}
@@ -1038,9 +1063,9 @@ roc_test <- test_result_list %>%
 	ggplot(aes(x = 1 - specificity, y = sensitivity, color = modelo)) +
 		geom_line(size = 1, alpha = 0.5) +
 		geom_abline(lty   = 2,
-						alpha = 0.5,
-						color = "gray50",
-						size  = 1.2) +
+				alpha = 0.5,
+				color = "gray50",
+				size  = 1.2) +
 		annotate("text",
 					x = 0.35,
 					y = 0.75,
@@ -1065,6 +1090,8 @@ list(roc_train, roc_test) %>%
     plot_annotation(title = "Diferencias entre AUC para conjuntos de entrenamiento y prueba")
 ```
 
+<br/>
+
 En el gráfico \@ref(fig:idf) vemos que el AUC del modelo KNN en el conjunto de
 prueba es más alto. Vemos que las métricas del conjunto de prueba son
 **ligeramente** superiores a las del conjunto de entrenamiento.
@@ -1077,7 +1104,7 @@ Crearemos dos tipos de gráficos:
 - `r coloring_font("**heatmap**", "#A24000")`
 
 Esto nos permitirá realizar una comparación en términos de matriz de confusión
-cuales son las diferencias entre cada uno de los modelos.
+para ver cuales son las diferencias entre cada uno de los modelos.
 
 ```{r}
 mx <- test_result_list %>% 
@@ -1100,13 +1127,18 @@ list(mx$mc, type = c("mosaic", "heatmap")) %>%
    plot_annotation(title = "Matriz de Confusión")
 ```
  
+<br/>
+
 En los primeros dos cuadrantes de la figura \@ref(fig:matrix) se observa que
 a nivel de mosaico ambos modelos tienen una capacidad predictiva similar. En
 los cuadrantes 3 y 4 lo vemos numéricamente.
 
 ### Métricas
 
-```{r}
+Analicemos de forma más numéricas las diferencias entre las métricas obtenidas
+con los datos de entrenamiento versus las obtenidas con los datos de prueba.
+
+```{r, comp}
 metricas_train %>%
 	mutate(datos = "entrenamiento", .after = modelo) %>%
 	select(-rank) %>%
@@ -1119,8 +1151,8 @@ metricas_train %>%
 <br/>
 
 En la tabla \@ref(tab:comp) vemos en verde el que obtuvo mayor valor con
-respecto a la métrica de esa columna.  En cuatro de las cinco métricas el
-modelo `r coloring_font("**smote_simple_knn**", "#AFC8D59")` del conjunto de
+respecto a la métrica de esa columna.  En tres de las cinco métricas el
+modelo `r coloring_font("**smote_simple_knn**", "#A24000")` del conjunto de
 validación (prueba) obtuvo mejores resultados.
 
 Veamos una forma diferente de analizar estas métricas:
@@ -1129,15 +1161,15 @@ Veamos una forma diferente de analizar estas métricas:
 metricas_train %>% 
 	select(-rank) %>% 
 	pivot_longer(cols = specificity:sensitivity,
-					 names_to = "metrica",
-					 values_to = "train") %>% 
+			names_to = "metrica",
+			values_to = "train") %>% 
 	bind_cols(metricas_test %>% 
 				 	pivot_longer(cols = specificity:sensitivity,
 					 names_to = "metrica",
 					 values_to = "test") %>% 
 				 	select(test)) %>% 
 	mutate(delta = test - train, 
-			 diff_porcentual = percent_format(accuracy = 0.01)(delta)) %>% 
+		diff_porcentual = percent_format(accuracy = 0.01)(delta)) %>% 
 	tabla(cap = "Métricas de Train contra test")
 ```
 
@@ -1157,7 +1189,9 @@ $\frac{3}{5}$ de las métricas de test fueron superiores a las de train.
 * Para `r coloring_font("**smote_outlier_svm_p_kernlab**", "#A24000")` tenemos
 que $\frac{2}{5}$ de las métricas de test fueron superiores a las de train.
 
-Demos un vistazo rápido a el resto de métricas
+#### Otras métricas
+
+Demos un vistazo rápido a otras métricas
 
 ```{r}
 mx$mc %>% 
@@ -1171,11 +1205,11 @@ mx$mc %>%
 
 # Modelo Definitivo
 
-`r resaltar("El modelo seleccionado es **knn**")`
+El modelo seleccionado es `r resaltar("KNN con balance SMOTE")`
 
 Una vez que tenemos el modelo correcto, con los parámetros seleccionados,
-volveremos que volver a entrenarlo con toda la base disponible (train + test)
-obteniendo el modelo definitivo que puedes poner en producción
+lo entrenaremos nuevamente con toda la base disponible (train + test) con el
+fin de obtener el modelo definitivo para que lo podamos poner en producción.
 
 ```{r}
 modelo_definitivo <- tune_res %>% 
@@ -1190,9 +1224,30 @@ modelo_definitivo <- tune_res %>%
 modelo_definitivo
 ```
 
+La variación de este modelo final con respecto al modelo de entrenamiento está
+en la `r coloring_font("**minimal misclassification**", "#A24000")`. El resto
+de valores se mantienen iguales.
+
 # Conclusiones
 
-- 
+- Se decidió comprobar únicamente los dos mejores modelos de cada algoritmo con
+los datos de prueba, teniendo en cuenta de que 
+`r rlt("no necesariamente los modelos con mejor desempeño en el entrenamiento tendrían el mejor desempeño con los datos de prueba", "#F39C12")`.
+Esto lo realizamos por practicidad.
 
+- El modelo seleccionado fue `r rlt(texto = "K-NN simple con ajuste de balance SMOTE", color = "#F39C12")`.
+
+- El modelo K-NN presentó con los datos de validación un `r rlt("desempeño ligeramente superior", "#F39C12")`
+al de SVM, por lo que su selección se basó también en la parsimonia.
+
+- Es probable que `r rlt("no tengamos overfitting", "#F39C12")` debido a que
+los resultados de las métricas de desempeño para el entrenamiento y prueba son
+bastante similares.  Aun no sabemos que tanto distante o cercanos deben estar
+las métricas para considerar que son parecidas.
+
+- La selección de los modelos se basó en la `r rlt("especificidad", "#F39C12")`,
+sin embargo, el análisis del AUC se realizó sobre la predicción de spam y no
+sobre la capacidad de los modelos de predecir correctamente el correo que **no
+es spam**.
 
 # Referencias
